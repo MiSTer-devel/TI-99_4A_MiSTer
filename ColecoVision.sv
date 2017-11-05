@@ -408,35 +408,42 @@ generate
 	genvar i;
 	for (i = 0; i <= 1; i++) begin : ctl
 		always_comb begin
-			if (~ctrl_p5[i] & ctrl_p8[i]) begin
+			reg [3:0] ctl1, ctl2;
+			reg p61,p62;
+			
+			ctl1 = 4'b1111;
+			ctl2 = 4'b1111;
+			p61 = 1;
+			p62 = 1;
+
+			if (~ctrl_p5[i]) begin
 				casex(keypad[i][0:13]) 
-					'b1xxxxxxxxxxxxx: ctrl1[i] = cv_key_0_c;
-					'b01xxxxxxxxxxxx: ctrl1[i] = cv_key_1_c;
-					'b001xxxxxxxxxxx: ctrl1[i] = cv_key_2_c;
-					'b0001xxxxxxxxxx: ctrl1[i] = cv_key_3_c;
-					'b00001xxxxxxxxx: ctrl1[i] = cv_key_4_c;
-					'b000001xxxxxxxx: ctrl1[i] = cv_key_5_c;
-					'b0000001xxxxxxx: ctrl1[i] = cv_key_6_c;
-					'b00000001xxxxxx: ctrl1[i] = cv_key_7_c;
-					'b000000001xxxxx: ctrl1[i] = cv_key_8_c;
-					'b0000000001xxxx: ctrl1[i] = cv_key_9_c;
-					'b00000000001xxx: ctrl1[i] = cv_key_asterisk_c;
-					'b000000000001xx: ctrl1[i] = cv_key_number_c;
-					'b0000000000001x: ctrl1[i] = cv_key_pt_c;
-					'b00000000000001: ctrl1[i] = cv_key_bt_c;
-					'b00000000000000: ctrl1[i] = cv_key_none_c;
+					'b1xxxxxxxxxxxxx: ctl1 = cv_key_0_c;
+					'b01xxxxxxxxxxxx: ctl1 = cv_key_1_c;
+					'b001xxxxxxxxxxx: ctl1 = cv_key_2_c;
+					'b0001xxxxxxxxxx: ctl1 = cv_key_3_c;
+					'b00001xxxxxxxxx: ctl1 = cv_key_4_c;
+					'b000001xxxxxxxx: ctl1 = cv_key_5_c;
+					'b0000001xxxxxxx: ctl1 = cv_key_6_c;
+					'b00000001xxxxxx: ctl1 = cv_key_7_c;
+					'b000000001xxxxx: ctl1 = cv_key_8_c;
+					'b0000000001xxxx: ctl1 = cv_key_9_c;
+					'b00000000001xxx: ctl1 = cv_key_asterisk_c;
+					'b000000000001xx: ctl1 = cv_key_number_c;
+					'b0000000000001x: ctl1 = cv_key_pt_c;
+					'b00000000000001: ctl1 = cv_key_bt_c;
+					'b00000000000000: ctl1 = cv_key_none_c;
 				endcase
-				ctrl_p6[i] <= ~keypad[i][19]; // button 2
+				p61 = ~keypad[i][19]; // button 2
 			end
-			else
-			if (ctrl_p5[i] & ~ctrl_p8[i]) begin
-				ctrl1[i] = ~keypad[i][14:17];
-				ctrl_p6[i] = ~keypad[i][18];  // button 1
+
+			if (~ctrl_p8[i]) begin
+				ctl2 = ~keypad[i][14:17];
+				p62 = ~keypad[i][18];  // button 1
 			end
-			else begin
-				ctrl1[i] = cv_key_none_c;
-				ctrl_p6[i] = 1;
-			end
+			
+			ctrl1[i] = ctl1 & ctl2;
+			ctrl_p6[i] = p61 & p62;
 		end
 	end
 endgenerate
