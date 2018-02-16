@@ -2,7 +2,7 @@
 //  ColecoVision
 //
 //  Port to MiSTer
-//  Copyright (C) 2017 Sorgelig
+//  Copyright (C) 2017,2018 Sorgelig
 //
 //  This program is free software; you can redistribute it and/or modify it
 //  under the terms of the GNU General Public License as published by the Free
@@ -51,7 +51,7 @@ module emu
 
 	output        LED_USER,  // 1 - ON, 0 - OFF.
 
-	// b[1]: 0 - LED status is system status ORed with b[0]
+	// b[1]: 0 - LED status is system status OR'd with b[0]
 	//       1 - LED status is controled solely by b[0]
 	// hint: supply 2'b00 to let the system control the LED.
 	output  [1:0] LED_POWER,
@@ -60,6 +60,7 @@ module emu
 	output [15:0] AUDIO_L,
 	output [15:0] AUDIO_R,
 	output        AUDIO_S, // 1 - signed audio samples, 0 - unsigned
+	output  [1:0] AUDIO_MIX, // 0 - no mix, 1 - 25%, 2 - 50%, 3 - 100% (mono)
 	input         TAPE_IN,
 
 	// SD-SPI
@@ -67,6 +68,7 @@ module emu
 	output        SD_MOSI,
 	input         SD_MISO,
 	output        SD_CS,
+	input         SD_CD,
 
 	//High latency DDR3 RAM interface
 	//Use for non-critical time purposes
@@ -240,6 +242,7 @@ wire [7:0] audio;
 assign AUDIO_L = {audio,8'd0};
 assign AUDIO_R = {audio,8'd0};
 assign AUDIO_S = 1;
+assign AUDIO_MIX = 0;
 
 assign CLK_VIDEO = clk_sys;
 assign CE_PIXEL = ce_10m7;
