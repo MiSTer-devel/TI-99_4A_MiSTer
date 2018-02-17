@@ -66,7 +66,9 @@ entity vdp18_hor_vert is
     vert_inc_o    : out boolean;
     hsync_n_o     : out std_logic;
     vsync_n_o     : out std_logic;
-    blank_o       : out boolean
+    blank_o       : out boolean;
+    hblank_o      : out boolean;
+    vblank_o      : out boolean
   );
 
 end vdp18_hor_vert;
@@ -213,5 +215,7 @@ begin
   num_line_o <= cnt_vert_q;
   vert_inc_o <= vert_inc_s;
   blank_o    <= hblank_q or vblank_q;
+  vblank_o   <= vblank_q;
+  hblank_o   <= hblank_q;
 
 end rtl;

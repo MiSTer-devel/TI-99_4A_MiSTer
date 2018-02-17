@@ -39,6 +39,8 @@ package vdp18_core_comp_pack is
       hsync_n_o     : out std_logic;
       vsync_n_o     : out std_logic;
       blank_n_o     : out std_logic;
+      hblank_o      : out std_logic;
+      vblank_o      : out std_logic;
       comp_sync_n_o : out std_logic
     );
   end component;

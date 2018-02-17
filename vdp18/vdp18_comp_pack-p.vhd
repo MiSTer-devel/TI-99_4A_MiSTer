@@ -42,7 +42,9 @@ package vdp18_comp_pack is
       vert_inc_o    : out boolean;
       hsync_n_o     : out std_logic;
       vsync_n_o     : out std_logic;
-      blank_o       : out boolean
+      blank_o       : out boolean;
+      hblank_o      : out boolean;
+      vblank_o      : out boolean
     );
   end component;
 
@@ -183,7 +185,11 @@ package vdp18_comp_pack is
       vert_active_i : in  boolean;
       hor_active_i  : in  boolean;
       blank_i       : in  boolean;
+      hblank_i      : in  boolean;
+      vblank_i      : in  boolean;
       blank_n_o     : out boolean;
+      hblank_n_o    : out boolean;
+      vblank_n_o    : out boolean;
       reg_col0_i    : in  std_logic_vector(0 to 3);
       pat_col_i     : in  std_logic_vector(0 to 3);
       spr0_col_i    : in  std_logic_vector(0 to 3);

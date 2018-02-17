@@ -108,6 +108,8 @@ assign LED_POWER = 0;
 assign VIDEO_ARX = status[1] ? 8'd16 : 8'd4;
 assign VIDEO_ARY = status[1] ? 8'd9  : 8'd3; 
 
+wire [1:0] scale = status[8:7];
+
 `include "build_id.v" 
 parameter CONF_STR = {
 	"Coleco;;",
@@ -115,9 +117,9 @@ parameter CONF_STR = {
 	"F,COLBIN;",
 	"-;",
 	"O1,Aspect ratio,4:3,16:9;",
+	"O78,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"-;",
 	"T6,Reset;",
-	"-;",
 	"-;",
 	"-;",
 	"-;",
@@ -139,7 +141,14 @@ pll pll
 );
 
 reg ce_10m7 = 0;
-always @(posedge clk_sys) ce_10m7 <= ~ce_10m7;
+reg ce_5m3 = 0;
+always @(posedge clk_sys) begin
+	reg [2:0] div;
+	
+	div <= div+1'd1;
+	ce_10m7 <= !div[1:0];
+	ce_5m3  <= !div[2:0];
+end
 
 /////////////////  HPS  ///////////////////////////
 
@@ -154,6 +163,7 @@ wire  [7:0] ioctl_index;
 wire        ioctl_wr;
 wire [24:0] ioctl_addr;
 wire  [7:0] ioctl_dout;
+wire        forced_scandoubler;
 
 hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 (
@@ -164,7 +174,8 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 
 	.buttons(buttons),
 	.status(status),
-	
+	.forced_scandoubler(forced_scandoubler),
+
 	.ioctl_download(ioctl_download),
 	.ioctl_index(ioctl_index),
 	.ioctl_wr(ioctl_wr),
@@ -245,7 +256,6 @@ assign AUDIO_S = 1;
 assign AUDIO_MIX = 0;
 
 assign CLK_VIDEO = clk_sys;
-assign CE_PIXEL = ce_10m7;
 
 wire [1:0] ctrl_p1;
 wire [1:0] ctrl_p2;
@@ -256,6 +266,10 @@ wire [1:0] ctrl_p6;
 wire [1:0] ctrl_p7 = 2'b11;
 wire [1:0] ctrl_p8;
 wire [1:0] ctrl_p9 = 2'b11;
+
+wire [7:0] R,G,B;
+wire hblank, vblank;
+wire hsync, vsync;
 
 cv_console console
 (
@@ -291,15 +305,42 @@ cv_console console
 	.cart_a_o(cart_a),
 	.cart_d_i(cart_d),
 
-	.rgb_r_o(VGA_R),
-	.rgb_g_o(VGA_G),
-	.rgb_b_o(VGA_B),
-	.hsync_n_o(VGA_HS),
-	.vsync_n_o(VGA_VS),
-	.blank_n_o(VGA_DE),
+	.rgb_r_o(R),
+	.rgb_g_o(G),
+	.rgb_b_o(B),
+	.hsync_n_o(hsync),
+	.vsync_n_o(vsync),
+	.hblank_o(hblank),
+	.vblank_o(vblank),
 
 	.audio_o(audio)
 );
+
+video_mixer #(.LINE_LENGTH(290)) video_mixer
+(
+	.*,
+
+	.ce_pix(ce_5m3),
+	.ce_pix_out(CE_PIXEL),
+
+	.scanlines({scale == 3, scale == 2}),
+	.scandoubler(scale || forced_scandoubler),
+	.hq2x(scale==1),
+
+	.mono(0),
+
+	.R(R),
+	.G(G),
+	.B(B),
+
+	// Positive pulses.
+	.HSync(~hsync),
+	.VSync(~vsync),
+	.HBlank(hblank),
+	.VBlank(vblank)
+);
+
+
 
 ////////////////  Control  ////////////////////////
 

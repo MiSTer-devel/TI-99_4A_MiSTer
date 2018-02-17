@@ -111,6 +111,8 @@ entity cv_console is
     hsync_n_o       : out std_logic;
     vsync_n_o       : out std_logic;
     blank_n_o       : out std_logic;
+    hblank_o        : out std_logic;
+    vblank_o        : out std_logic;
     comp_sync_n_o   : out std_logic;
     -- Audio Interface --------------------------------------------------------
     audio_o         : out signed(7 downto 0)
@@ -316,6 +318,8 @@ begin
       hsync_n_o     => hsync_n_o,
       vsync_n_o     => vsync_n_o,
       blank_n_o     => blank_n_o,
+      hblank_o      => hblank_o,
+      vblank_o      => vblank_o,
       comp_sync_n_o => comp_sync_n_o
     );
 

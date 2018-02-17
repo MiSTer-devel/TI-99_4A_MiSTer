@@ -104,6 +104,8 @@ entity vdp18_core is
     hsync_n_o     : out std_logic;
     vsync_n_o     : out std_logic;
     blank_n_o     : out std_logic;
+    hblank_o      : out std_logic;
+    vblank_o      : out std_logic;
     comp_sync_n_o : out std_logic
   );
 
@@ -133,6 +135,8 @@ architecture struct of vdp18_core is
   signal hsync_n_s,
          vsync_n_s        : std_logic;
   signal blank_s          : boolean;
+  signal hblank_s         : boolean;
+  signal vblank_s         : boolean;
 
   signal vert_inc_s       : boolean;
 
@@ -175,6 +179,8 @@ architecture struct of vdp18_core is
   signal irq_s            : boolean;
 
   signal blank_n          : boolean;
+  signal hblank_n          : boolean;
+  signal vblank_n          : boolean;
 
 begin
 
@@ -215,7 +221,9 @@ begin
       vert_inc_o    => vert_inc_s,
       hsync_n_o     => hsync_n_s,
       vsync_n_o     => vsync_n_s,
-      blank_o       => blank_s
+      blank_o       => blank_s,
+      hblank_o      => hblank_s,
+      vblank_o      => vblank_s
     );
 
   hsync_n_o     <= hsync_n_s;
@@ -378,6 +386,8 @@ begin
       vert_active_i => vert_active_s,
       hor_active_i  => hor_active_s,
       blank_i       => blank_s,
+      hblank_i      => hblank_s,
+      vblank_i      => vblank_s,
       reg_col0_i    => reg_col0_s,
       pat_col_i     => pat_col_s,
       spr0_col_i    => spr0_col_s,
@@ -386,11 +396,15 @@ begin
       spr3_col_i    => spr3_col_s,
       col_o         => col_o,
 		blank_n_o     => blank_n,
+		hblank_n_o    => hblank_n,
+		vblank_n_o    => vblank_n,
       rgb_r_o       => rgb_r_o,
       rgb_g_o       => rgb_g_o,
       rgb_b_o       => rgb_b_o
     );
 	 
-	 blank_n_o <= '1' when blank_n else '0';
+	 blank_n_o <= '1' when blank_n  else '0';
+	 hblank_o  <= '0' when hblank_n else '1';
+	 vblank_o  <= '0' when vblank_n else '1';
 
 end struct;

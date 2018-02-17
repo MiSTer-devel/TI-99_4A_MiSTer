@@ -59,7 +59,11 @@ entity vdp18_col_mux is
     vert_active_i : in  boolean;
     hor_active_i  : in  boolean;
     blank_i       : in  boolean;
+    hblank_i      : in  boolean;
+    vblank_i      : in  boolean;
     blank_n_o     : out boolean;
+    hblank_n_o    : out boolean;
+    vblank_n_o    : out boolean;
     reg_col0_i    : in  std_logic_vector(0 to 3);
     pat_col_i     : in  std_logic_vector(0 to 3);
     spr0_col_i    : in  std_logic_vector(0 to 3);
@@ -170,6 +174,8 @@ begin
         rgb_g_o <= std_logic_vector(to_unsigned(rgb_g_v, 8));
         rgb_b_o <= std_logic_vector(to_unsigned(rgb_b_v, 8));
 		  blank_n_o <= not blank_i;
+		  hblank_n_o <= not hblank_i;
+		  vblank_n_o <= not vblank_i;
       end if;
 
     end if;
