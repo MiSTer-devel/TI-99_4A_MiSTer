@@ -156,7 +156,7 @@ wire [31:0] status;
 wire  [1:0] buttons;
 
 wire [15:0] joya, joyb;
-wire [65:0] ps2_key;
+wire [10:0] ps2_key;
 
 wire        ioctl_download;
 wire  [7:0] ioctl_index;
@@ -344,14 +344,13 @@ video_mixer #(.LINE_LENGTH(290)) video_mixer
 
 ////////////////  Control  ////////////////////////
 
-wire pressed    = (ps2_key[15:8] != 8'hf0);
-wire extended   = (~pressed ? (ps2_key[23:16] == 8'he0) : (ps2_key[15:8] == 8'he0));
-wire [8:0] code = ps2_key[63:24] ? 9'd0 : {extended, ps2_key[7:0]}; // filter out PRNSCR and PAUSE
+wire       pressed = ps2_key[9];
+wire [8:0] code    = ps2_key[8:0];
 always @(posedge clk_sys) begin
 	reg old_state;
-	old_state <= ps2_key[64];
+	old_state <= ps2_key[10];
 	
-	if(old_state != ps2_key[64]) begin
+	if(old_state != ps2_key[10]) begin
 		casex(code)
 			'hX75: btn_up    <= pressed;
 			'hX72: btn_down  <= pressed;
