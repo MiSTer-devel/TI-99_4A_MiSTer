@@ -26,7 +26,7 @@ ENTITY dpram16_8 IS
 		q_a		: OUT STD_LOGIC_VECTOR (width-1 DOWNTO 0);
 		q_b		: OUT STD_LOGIC_VECTOR (width/2-1 DOWNTO 0)
 	);
-END dpram;
+END dpram16_8;
 
 
 ARCHITECTURE SYN OF dpram16_8 IS
