@@ -30,8 +30,8 @@ use IEEE.NUMERIC_STD.ALL;
 
 -- Uncomment the following library declaration if instantiating
 -- any Xilinx primitives in this code.
-library UNISIM;
-use UNISIM.VComponents.all;
+--library UNISIM;
+--use UNISIM.VComponents.all;
 
 --0000..1FFF     Console ROM
 --2000..3FFF     (8K, part of 32K RAM expansion)
@@ -57,88 +57,87 @@ use UNISIM.VComponents.all;
 --...
 ----------------------------------------------------------------------------------
 entity ep994a is
-    Port ( clock : in  STD_LOGIC;
-           rxd : in  STD_LOGIC;
-           txd : out  STD_LOGIC;
-           led : out  STD_LOGIC_VECTOR (7 downto 0);
-
-			  SWITCH		: in std_logic;
-			  
-			  -- VGA output
-			  VGA_HSYNC	: out std_logic;
-			  VGA_VSYNC	: out std_logic;
-			  VGA_RED	: out std_logic_vector(2 downto 0);
-			  VGA_BLUE	: out std_logic_vector(1 downto 0);
-			  VGA_GREEN	: out std_logic_vector(2 downto 0);
-			  
-			  -- DEBUG (PS2 KBD port)
-			  DEBUG1		: out std_logic;
-			  DEBUG2		: out std_logic;
-
-			  -- SWITCHES (in reverse order compared to the markings)
-			  SWI       : in std_logic_vector(7 downto 0);
-			  -- SWI 0: when set, CPU will automatically be taken out of reset after copying FLASH to RAM.
-			  
-			  -- AUDIO
-			  AUDIO_L	: out std_logic;
-			  AUDIO_R	: out std_logic;
-			  
-			  -- FLASH ROM
-			  FLASH_CS   : out std_logic;
-			  FLASH_CK   : out std_logic;
-			  FLASH_SI   : out std_logic;
-			  FLASH_SO   : in std_logic;
-			  FLASH_WP   : out std_logic;
-			  FLASH_HOLD : out std_logic;
-			  
+  generic (
+    is_pal_g        : integer := 0;
+    compat_rgb_g    : integer := 0
+  );
+  port (
+    -- Global Interface -------------------------------------------------------
+    clk_i           : in  std_logic;
+    clk_en_10m7_i   : in  std_logic;
+    reset_n_i       : in  std_logic;
+    por_n_o         : out std_logic;
+    -- Controller Interface ---------------------------------------------------
 			  -- GPIO port
-			  GPIO		 : inout std_logic_vector(15 downto 0);
+			  epGPIO		 : inout std_logic_vector(15 downto 0);
 				-- GPIO 0..7  = IO1P..IO8P - these are the keyboard row strobes.
 				-- GPIO 8..15 = IO1N..IO8N - these are key input signals.
-				
-			  LPC1343_RQ	: out STD_LOGIC; 
-			  LPC1343_MISO : out STD_LOGIC;
-			  LPC1343_MOSI : in STD_LOGIC;
-			  LPC1343_CLK  : in STD_LOGIC;
-			  LPC1343_CS_n : in STD_LOGIC;
-			  LPC1343_X 	: in STD_LOGIC;	-- unused for now
+    -- BIOS ROM Interface -----------------------------------------------------
+    --bios_rom_a_o    : out std_logic_vector(12 downto 0);
+    --bios_rom_ce_n_o : out std_logic;
+    --bios_rom_d_i    : in  std_logic_vector( 7 downto 0);
+    -- CPU RAM Interface ------------------------------------------------------
+    cpu_ram_a_o     : out std_logic_vector(16 downto 0);
+    cpu_ram_ce_n_o  : out std_logic;
+    cpu_ram_we_n_o  : out std_logic;
+    cpu_ram_be_n_o  : out std_logic_vector( 1 downto 0);
+    cpu_ram_d_i     : in  std_logic_vector(15 downto 0);
+    cpu_ram_d_o     : out std_logic_vector(15 downto 0);
+    -- Video RAM Interface ----------------------------------------------------
+    vram_a_o        : out std_logic_vector(13 downto 0);
+    vram_we_o       : out std_logic;
+    vram_d_o        : out std_logic_vector( 7 downto 0);
+    vram_d_i        : in  std_logic_vector( 7 downto 0);
+    -- Cartridge ROM Interface ------------------------------------------------
+    --cart_a_o        : out std_logic_vector(14 downto 0);
+    --cart_en_80_n_o  : out std_logic;
+    --cart_en_a0_n_o  : out std_logic;
+    --cart_en_c0_n_o  : out std_logic;
+    --cart_en_e0_n_o  : out std_logic;
+    --cart_d_i        : in  std_logic_vector( 7 downto 0);
+    -- RGB Video Interface ----------------------------------------------------
+    col_o           : out std_logic_vector( 3 downto 0);
+    rgb_r_o         : out std_logic_vector( 7 downto 0);
+    rgb_g_o         : out std_logic_vector( 7 downto 0);
+    rgb_b_o         : out std_logic_vector( 7 downto 0);
+    hsync_n_o       : out std_logic;
+    vsync_n_o       : out std_logic;
+    blank_n_o       : out std_logic;
+    hblank_o        : out std_logic;
+    vblank_o        : out std_logic;
+    comp_sync_n_o   : out std_logic;
+    -- Audio Interface --------------------------------------------------------
+    audio_o         : out signed(7 downto 0);
+			  -- DEBUG (PS2 KBD port)
+			  --DEBUG1		: out std_logic;
+			  --DEBUG2		: out std_logic;
+
+			  -- SWITCHES (in reverse order compared to the markings)
+			  --SWI       : in std_logic_vector(7 downto 0);
+			  -- SWI 0: when set, CPU will automatically be taken out of reset after copying FLASH to RAM.
 			  
-			  -- SRAM
-			  SRAM_DAT	: inout std_logic_vector(31 downto 0);
-			  SRAM_ADR	: out std_logic_vector(18 downto 0);
-			  SRAM_CE0	: out std_logic;
-			  SRAM_CE1	: out std_logic;
-			  SRAM_WE	: out std_logic;
-			  SRAM_OE	: out std_logic;
-			  SRAM_BE	: out std_logic_vector(3 downto 0)
-			);
+	flashloading_i   : in std_logic
+);
+
 end ep994a;
+
+-- pragma translate_off
+use std.textio.all;
+-- pragma translate_on
+
+use work.tech_comp_pack.cv_por;
+use work.cv_comp_pack.cv_clock;
+use work.cv_comp_pack.cv_ctrl;
+use work.cv_comp_pack.cv_addr_dec;
+use work.cv_comp_pack.cv_bus_mux;
+use work.vdp18_core_comp_pack.vdp18_core;
+use work.sn76489_comp_pack.sn76489_top;
+
 
 architecture Behavioral of ep994a is
 
-	 component serloader port (
-		  clk 		: in  STD_LOGIC;
-		  rst 		: in  STD_LOGIC;
-		  tx				: out STD_LOGIC;
-		  rx				: in STD_LOGIC;
-		  -- SPI interface begin
-		  spi_cs_n		: in STD_LOGIC;
-		  spi_clk		: in STD_LOGIC;
-		  spi_mosi		: in STD_LOGIC;
-		  spi_miso     : out STD_LOGIC;
-		  spi_rq			: out STD_LOGIC;	-- spi request - currently used for debugging.
-		  -- SPI interface end
-		  mem_addr 	: out  STD_LOGIC_VECTOR (31 downto 0);
-		  mem_data_out : out  STD_LOGIC_VECTOR (7 downto 0);
-		  mem_data_in : in  STD_LOGIC_VECTOR (7 downto 0);
-		  mem_read_rq : out  STD_LOGIC;
-		  mem_read_ack : in  STD_LOGIC;
-		  mem_write_rq : out  STD_LOGIC;
-		  mem_write_ack : in  STD_LOGIC
-		);
-	 end component;
- 
-	
+	--signal optSWI	 		: std_logic_vector(7 downto 0) := b"11111111";
+	signal optSWI	 		: std_logic_vector(7 downto 0) := b"01111111";
 	signal funky_reset 		: std_logic_vector(15 downto 0) := (others => '0');
 	signal real_reset			: std_logic;
 	signal real_reset_n		: std_logic;
@@ -171,14 +170,14 @@ architecture Behavioral of ep994a is
 	signal debug_sram_oe  : std_logic;
 	signal sram_addr_bus  : std_logic_vector(18 downto 0); 
 	signal sram_16bit_read_bus : std_logic_vector(15 downto 0);	-- choose between (31..16) and (15..0) during reads.
+
+  signal por_n_s          : std_logic;
+  signal reset_n_s        : std_logic;
+  signal switch           : std_logic;
 	
-	signal clk_ref_ibuf 		: std_logic;
 	signal clk 					: std_logic;				-- output primary clock
-	signal clk0					: std_logic;
-	signal clkfx				: std_logic;
-	signal clkfb				: std_logic;
-	signal locked_internal	: std_logic;
-	signal status_internal  : std_logic_vector(7 downto 0);
+  signal clk_en_3m58_s    : std_logic;
+  signal clk_en_cpu_s     : std_logic;
 	
 	-- TMS99105 control signals
 	signal cpu_addr			: std_logic_vector(15 downto 0);
@@ -195,12 +194,8 @@ architecture Behavioral of ep994a is
 	-- VDP read and write signals
 	signal vdp_wr 				: std_logic;
 	signal vdp_rd 				: std_logic;
-	signal vga_vsync_int		: std_logic;
-	signal vga_hsync_int		: std_logic;
-	signal vdp_debug1			: std_logic;
-	signal vdp_debug2			: std_logic;
 	signal vdp_data_out		: std_logic_vector(15 downto 0);
-	signal vdp_interrupt		: std_logic;
+	signal vdp_interrupt		: std_logic; --low true
 	
 	-- GROM signals
 	signal grom_data_out		: std_logic_vector(7 downto 0);
@@ -227,10 +222,11 @@ architecture Behavioral of ep994a is
 	signal basic_rom_bank : std_logic_vector(6 downto 1) := "000000";	-- latch ROM selection, 512K ROM support
 	signal cartridge_cs	 : std_logic;	-- 0x6000..0x7FFF
 	
-	-- audio subsystem
-	signal dac_data		: std_logic_vector(7 downto 0);	-- data from TMS9919 to DAC input
-	signal dac_out_bit	: std_logic;		-- output to pin
+  -- SN76489 signal
+  signal psg_ready_s      : std_logic;
 	signal tms9919_we		: std_logic;		-- write enable pulse for the audio "chip"
+	signal tms9919_we_clk: std_logic;		-- write enable pulse for the audio "chip"
+	signal audio_data_out: std_logic_vector(7 downto 0);
 	
 	-- disk subsystem
 	signal cru1100			: std_logic;		-- disk controller CRU select
@@ -392,103 +388,61 @@ architecture Behavioral of ep994a is
 			  addr	: out STD_LOGIC_VECTOR(19 downto 0)		-- 1 megabyte GROM address out
 			  );
 	end component;
--------------------------------------------------------------------------------
--- Magnus Karlsson's FLASH loader component written in Verilog
-	component flash is 
-	Port (
-		clk8 			: in STD_LOGIC;
-		n_reset 		: in STD_LOGIC;
-		bad_load 	: in STD_LOGIC;
-		load_disk 	: in STD_LOGIC;
-		disk			: in STD_LOGIC_VECTOR(3 downto 0);
-		dioBusControl : in STD_LOGIC;
-		romLoaded 	: out STD_LOGIC;
-		diskLoaded 	: out STD_LOGIC;
-		memoryDataOut : out STD_LOGIC_VECTOR(15 downto 0);
-		memoryAddr 	: out STD_LOGIC_VECTOR(19 downto 0);
-		n_ramWE 		: out STD_LOGIC;
-		loading 		: out STD_LOGIC;
-		spi_sclk 	: out STD_LOGIC;
-		spi_ss 		: out STD_LOGIC;
-		spi_mosi 	: out STD_LOGIC;
-		spi_miso 	: in STD_LOGIC
-	);
-	end component;
 
 begin
   
- clkin1_buf : IBUFG
-  port map
-   (O => clk_ref_ibuf,
-    I => clock);
-  
-  
-  dcm_sp_inst: DCM_SP
-  generic map
-   (CLKDV_DIVIDE          => 2.000,
-    CLKFX_DIVIDE          => 16,			-- try to multiply by 2 overall to get to 100MHz
-    CLKFX_MULTIPLY        => 32,
-    CLKIN_DIVIDE_BY_2     => FALSE,
-    CLKIN_PERIOD          => 20.00,
-    CLKOUT_PHASE_SHIFT    => "NONE",
-    CLK_FEEDBACK          => "1X",
-    DESKEW_ADJUST         => "SYSTEM_SYNCHRONOUS",
-    PHASE_SHIFT           => 0,
-    STARTUP_WAIT          => FALSE)
-  port map
-   -- Input clock
-   (CLKIN                 => clk_ref_ibuf,
-    CLKFB                 => clkfb,
-    -- Output clocks
-    CLK0                  => clk0,
-    CLK90                 => open,
-    CLK180                => open,
-    CLK270                => open,
-    CLK2X                 => open,
-    CLK2X180              => open,
-    CLKFX                 => clkfx,
-    CLKFX180              => open,
-    CLKDV                 => open,
-   -- Ports for dynamic phase shift
-    PSCLK                 => '0',
-    PSEN                  => '0',
-    PSINCDEC              => '0',
-    PSDONE                => open,
-   -- Other control and status signals
-    LOCKED                => locked_internal,
-    STATUS                => status_internal,
-    RST                   => '0',
-   -- Unused pin, tie low
-    DSSEN                 => '0');
+  -----------------------------------------------------------------------------
+  -- Reset generation
+  -----------------------------------------------------------------------------
+  por_b : cv_por
+    port map (
+      clk_i   => clk_i,
+      por_n_o => por_n_s
+    );
+  por_n_o   <= por_n_s;
+  reset_n_s <= por_n_s and reset_n_i;
 
-	-- Output buffering
-	-------------------------------------
-	clkf_buf    : BUFG   port map (O => clkfb, I => clk0);
-	clkout1_buf : BUFG   port map (O => clk,   I => clkfx);
-	-------------------------------------
+
+  -----------------------------------------------------------------------------
+  -- Clock generation
+  -----------------------------------------------------------------------------
+  clock_b : cv_clock
+    port map (
+      clk_i         => clk_i,
+      clk_en_10m7_i => clk_en_10m7_i,
+      reset_n_i     => reset_n_s,
+      clk_en_3m58_o => clk_en_3m58_s
+    );
+
+  --clk_en_cpu_s  <= clk_en_3m58_s and psg_ready_s and not m1_wait_q;
+  clk <= clk_i;
+
 	-------------------------------------
 
 	-- Use all 32 bits of RAM, we use CE0 and CE1 to control what chip is active.
 	-- The byte enables are driven the same way for both chips.
-	SRAM_BE 		<= "0000" when cpu_access = '1' or flashLoading = '1' else	-- TMS99105 is always 16-bit, use CE 
-						"1010" when mem_addr(0) = '1' else	-- lowest byte
-						"0101";										-- second lowest byte
-	SRAM_ADR 	<= '0' & sram_addr_bus(18 downto 1);	-- sram_addr_bus(0) selects between the two chips
-	SRAM_DAT		<= -- broadcast 16-bit wide lines when flash loading is active
-						flashDataOut & flashDataOut when cpu_access='0' and flashLoading='1' and mem_drive_bus='1' else
+	cpu_ram_be_n_o	<= "00" when cpu_access = '1' else -- or flashLoading = '1' else	-- TMS99105 is always 16-bit, use CE 
+						--"10" when mem_addr(0) = '1' else	-- lowest byte
+						"01";										-- second lowest byte
+	cpu_ram_a_o(14 downto 0)	<= sram_addr_bus(14 downto 0);	-- sram_addr_bus(0) selects between the two chips
+	cpu_ram_a_o(16 downto 15)	<= "00" when sram_addr_bus(18) = '0' else      --  Cart Rom                        0x00000-7FFFF all four of these are mirrored across 64KB
+						"11" when sram_addr_bus(17) = '1' else --  SRAM                            0xC0000-FFFFF
+						"01" when sram_addr_bus(16) = '0' else --  GROM                            0x80000-9FFFF
+						"10";                                  --  DROM and BootRom and Scratchpad 0xA0000-BFFFF
+	cpu_ram_d_o		<= -- broadcast 16-bit wide lines when flash loading is active
+						flashDataOut when cpu_access='0' and flashLoading='1' and mem_drive_bus='1' else
 						-- broadcast on all byte lanes when memory controller is writing
-						mem_data_out & mem_data_out & mem_data_out & mem_data_out when cpu_access='0' and mem_drive_bus='1' else
+						--mem_data_out & mem_data_out when cpu_access='0' and mem_drive_bus='1' else
 						-- broadcast on 16-bit wide lanes when CPU is writing
-						data_from_cpu & data_from_cpu when cpu_access='1' and MEM_n='0' and WE_n = '0' else
+						data_from_cpu when cpu_access='1' and MEM_n='0' and WE_n = '0' else
 						(others => 'Z');
 						
-	sram_16bit_read_bus <= SRAM_DAT(15 downto 0) when sram_addr_bus(0)='0' else SRAM_DAT(31 downto 16);
+	sram_16bit_read_bus <= cpu_ram_d_i; --SRAM_DAT(15 downto 0) when sram_addr_bus(0)='0' else SRAM_DAT(31 downto 16);
 						
-	SRAM_CE0	<=		(debug_sram_ce0 or sram_addr_bus(0))       when cpu_access = '0' else (MEM_n or sram_addr_bus(0));
-	SRAM_CE1	<= 	(debug_sram_ce0 or (not sram_addr_bus(0))) when cpu_access = '0' else (MEM_n or (not sram_addr_bus(0)));
-	SRAM_WE	<=		debug_sram_we;  -- when cpu_access = '0' else WE_n; 
-	SRAM_OE	<=		debug_sram_oe; -- when cpu_access = '0' else RD_n; 	
-	
+	cpu_ram_ce_n_o	<=		(debug_sram_ce0)       when cpu_access = '0' else (MEM_n);
+	--SRAM_CE1	<= 	(debug_sram_ce0 or (not sram_addr_bus(0))) when cpu_access = '0' else (MEM_n or (not sram_addr_bus(0)));
+	cpu_ram_we_n_o	<=		debug_sram_we;  -- when cpu_access = '0' else WE_n; 
+	--SRAM_OE	<=		debug_sram_oe; -- when cpu_access = '0' else RD_n; 	
 	-------------------------------------size
 	
 	-- CPU reset out. If either cpu_reset_ctrl(0) or funky_reset(MSB) is zero, put CPU to reset.
@@ -500,14 +454,14 @@ begin
 	
 	-------------------------------------
 	-- vdp interrupt
-	-- INTERRUPT <=  not vdp_interrupt when cru9901(2)='1' else '1';	-- TMS9901 interrupt mask bit
-	conl_int <= not vdp_interrupt when cru9901(2)='1' else '1';	-- TMS9901 interrupt mask bit
+	-- INTERRUPT <=  vdp_interrupt when cru9901(2)='1' else '1';	-- TMS9901 interrupt mask bit
+	conl_int <= vdp_interrupt when cru9901(2)='1' else '1';	-- TMS9901 interrupt mask bit
 	-- cartridge memory select
   	cartridge_cs 	<= '1' when MEM_n = '0' and cpu_addr(15 downto 13) = "011" else '0'; -- cartridge_cs >6000..>7FFF
 	
 	-------------------------------------
 	-- key matrix support
-	GPIO(15 downto 8) <= "ZZZZZZZZ";	-- IO1N..IO8N are inputs
+	epGPIO(15 downto 8) <= "ZZZZZZZZ";	-- IO1N..IO8N are inputs
 	-- KBD connector signals
 	-- 15 | IO8P | col#3
 	-- 14 | IO7P | col#2	
@@ -515,15 +469,22 @@ begin
 	-- 12 | IO5P | col#0	
 	--  9 | IO4P | col#4	
 	--  8 | IO3P | col#5
-	GPIO(1 downto 0) <= "ZZ";	-- unused
+	--epGPIO(1 downto 0) <= "ZZ";	-- unused
 	-- For the column decoder, rely on pull-ups to bring the row selectors high
-	GPIO(7) <= '0' when cru9901(20 downto 18) = "011" else 'Z'; 	-- col#3
-	GPIO(6) <= '0' when cru9901(20 downto 18) = "010" else 'Z'; 	-- col#2
-	GPIO(5) <= '0' when cru9901(20 downto 18) = "001" else 'Z'; 	-- col#1
-	GPIO(4) <= '0' when cru9901(20 downto 18) = "000" else 'Z'; 	-- col#0
-	GPIO(3) <= '0' when cru9901(20 downto 18) = "100" else 'Z'; 	-- col#4
-	GPIO(2) <= '0' when cru9901(20 downto 18) = "101" else 'Z'; 	-- col#5
+	epGPIO(7) <= '0' when cru9901(20 downto 18) = "011" else 'Z'; 	-- col#3
+	epGPIO(6) <= '0' when cru9901(20 downto 18) = "010" else 'Z'; 	-- col#2
+	epGPIO(5) <= '0' when cru9901(20 downto 18) = "001" else 'Z'; 	-- col#1
+	epGPIO(4) <= '0' when cru9901(20 downto 18) = "000" else 'Z'; 	-- col#0
+	epGPIO(3) <= '0' when cru9901(20 downto 18) = "100" else 'Z'; 	-- col#4
+	epGPIO(2) <= '0' when cru9901(20 downto 18) = "101" else 'Z'; 	-- col#5
+	epGPIO(1) <= '0' when cru9901(20 downto 18) = "110" else 'Z'; 	-- col#6
+	epGPIO(0) <= '0' when cru9901(20 downto 18) = "111" else 'Z'; 	-- col#7
 	-------------------------------------
+	
+	switch <= not reset_n_s;
+	mem_read_rq <= '0';
+	mem_write_rq <= '0';
+	flashloading <= flashloading_i;--'0';
 	
 	process(clk, switch)
 	variable ki : integer range 0 to 7;
@@ -571,7 +532,7 @@ begin
 				-- if switch 2 (SWI[6]) is set we run at 31 wait states
 				-- if switch 2 (SWI[5]) is set we run at 8 wait states
 				-- else we run at zero wait states
-				if SWI(7)='1' then
+				if optSWI(7)='1' then
 					if cpu_as='1' then
 						-- setup number of wait states depending on address accessed
 						case cpu_addr(15 downto 12) is
@@ -582,9 +543,9 @@ begin
 								waits <= x"F0";	-- 196, i.e. 200, i.e. 2000ns
 						end case;
 					end if;
-				elsif SWI(6)='1' then
+				elsif optSWI(6)='1' then
 					waits <= x"1F";
-				elsif SWI(5)='1' then
+				elsif optSWI(5)='1' then
 					waits <= x"08";
 				else
 					waits <= (others => '0');
@@ -594,7 +555,7 @@ begin
 				-- data from flash memory to SRAM.
 				cpu_reset <= not (cpu_reset_ctrl(0) and real_reset and not flashLoading);
 				lastFlashLoading <= flashLoading;
-				if SWI(0) = '1' then 
+				if optSWI(0) = '1' then 
 					if flashLoading='1' then
 						cpu_reset_ctrl <= x"FC";	-- during flash loading force reset on
 						basic_rom_bank <= (others => '0');
@@ -688,7 +649,7 @@ begin
 						mem_read_ack <= '0';
 						mem_write_ack <= '0';
 --						cpu_access <= '1';		
-						DEBUG2 <= '0';		
+						--DEBUG2 <= '0';		
 						if flashLoading = '1' and cpu_holda = '1' and flashRamWE_n='0' and lastFlashRamWE_n='1' then
 							-- We are loading from flash memory chip to SRAM.
 							-- The total amount is 256K bytes. We perform the following mapping:
@@ -730,7 +691,7 @@ begin
 							debug_sram_ce0 <= '0';	-- initiate write cycle
 							debug_sram_WE <= '0';	
 							mem_drive_bus <= '1';	-- only writes drive the bus
-							DEBUG2 <= '1';
+							--DEBUG2 <= '1';
 							cpu_mem_write_pending <= '0';
 						end if;
 					when wr0 => 
@@ -879,10 +840,14 @@ begin
 				wr_sampler <= wr_sampler(wr_sampler'length-2 downto 0) & WE_n;
 				rd_sampler <= rd_sampler(rd_sampler'length-2 downto 0) & RD_n;
 				cruclk_sampler <= cruclk_sampler(cruclk_sampler'length-2 downto 0) & cpu_cruclk;
-				vdp_wr <= '0';
-				vdp_rd <= '0';
+				if (clk_en_10m7_i = '1') then
+					vdp_wr <= '0';
+					vdp_rd <= '0';
+				end if;
 				grom_we <= '0';
-				tms9919_we <= '0';
+				if (psg_ready_s = '1') then
+					tms9919_we <= '0';
+				end if;				
 				paging_wr_enable <= '0';
 				if sams_regs(6)='0' then	-- if sams_regs(6) is set I/O is out and paged RAM is there instead
 					if go_write = '1' and MEM_n='0' then
@@ -896,6 +861,7 @@ begin
 							basic_rom_bank <= cpu_addr(6 downto 1);	-- capture ROM bank select
 						elsif cpu_addr(15 downto 8) = x"84" then	
 							tms9919_we <= '1';		-- Audio chip write
+							audio_data_out <= data_from_cpu(15 downto 8);
 						elsif paging_registers = '1' then 
 							paging_wr_enable <= '1';
 						end if;
@@ -947,18 +913,18 @@ begin
 					ki := to_integer(unsigned(cpu_addr(3 downto 1))) - 3; -- row select on address
 --					cru_read_bit <= keyboard(to_integer(unsigned(cru9901(20 downto 18))), ki); -- column select on multiplexor select
 					case ki is
-						when 0 => cru_read_bit <= GPIO(8);
-						when 1 => cru_read_bit <= GPIO(9);
-						when 2 => cru_read_bit <= GPIO(10);
-						when 3 => cru_read_bit <= GPIO(11);
-						when 4 => cru_read_bit <= GPIO(12);
-						when 5 => cru_read_bit <= GPIO(13);
-						when 6 => cru_read_bit <= GPIO(14);
-						when 7 => cru_read_bit <= GPIO(15);
+						when 0 => cru_read_bit <= epGPIO(8);
+						when 1 => cru_read_bit <= epGPIO(9);
+						when 2 => cru_read_bit <= epGPIO(10);
+						when 3 => cru_read_bit <= epGPIO(11);
+						when 4 => cru_read_bit <= epGPIO(12);
+						when 5 => cru_read_bit <= epGPIO(13);
+						when 6 => cru_read_bit <= epGPIO(14);
+						when 7 => cru_read_bit <= epGPIO(15);
 					end case;
 					
 				elsif cpu_addr(15 downto 1) & '0' = x"0004" then
-					cru_read_bit <= not vdp_interrupt; -- VDP interrupt status (read with TB 2 instruction)
+					cru_read_bit <= vdp_interrupt; -- VDP interrupt status (read with TB 2 instruction)
 				elsif cpu_addr(15 downto 1) & '0' = x"0000" then
 					cru_read_bit <= cru9901(0);
 				elsif cpu_addr(15 downto 5) = "00000000001" then
@@ -973,44 +939,10 @@ begin
 		end if;	-- rising_edge
 	end process;
 	
-		
-	command_processor : serloader port map (
-		clk 		=> clk,
-		rst 		=> real_reset_n,
-		tx			=> txd,
- 		rx			=> rxd,
-	   -- SPI interface begin
-	   spi_cs_n	=> LPC1343_CS_n,
-	   spi_clk	=> LPC1343_CLK,
-	   spi_mosi	=> LPC1343_MOSI,
-	   spi_miso => LPC1343_MISO,
-	   spi_rq	=> LPC1343_RQ,
-	   -- SPI interface end
-		mem_addr 		=> mem_addr,
-		mem_data_out 	=> mem_data_out,
-		mem_data_in		=> mem_data_in,
-		mem_read_rq 	=> mem_read_rq,
-		mem_read_ack 	=> mem_read_ack,
-		mem_write_rq 	=> mem_write_rq,
-		mem_write_ack	=> mem_write_ack	
-		);
 
-	-- The leds have two functions: during Flash loading they make a progress bar of the LED to RAM transfer.
-	-- During normal operation they show various control signals.
---	led(0) <= cpu_reset 		when flashLoading = '0' else '1';
---	led(1) <= cpu_hold  		when flashLoading = '0' else '1' when flashAddrOut(17 downto 15) >= "000" else '0';
---	led(2) <= cpu_holda 		when flashLoading = '0' else '1' when flashAddrOut(17 downto 15) >= "001" else '0';
---	led(3) <= sams_regs(0) 	when flashLoading = '0' else '1' when flashAddrOut(17 downto 15) >= "010" else '0';
---	led(4) <= sams_regs(1) 	when flashLoading = '0' else '1' when flashAddrOut(17 downto 15) >= "011" else '0';
---	led(5) <= cpu_wr   		when flashLoading = '0' else '1' when flashAddrOut(17 downto 15) >= "100" else '0';
---	led(6) <= '1'				when flashLoading = '0' else '1' when flashAddrOut(17 downto 15) >= "101" else '0';
---	led(7) <= alatch_counter(19) when flashLoading = '0' else '1' when flashAddrOut(17 downto 15) = "110" else '0';
-	led <= spiLPC_tx;
-
-	
 	cpu_hold <= '1' when mem_read_rq='1' or mem_write_rq='1' or (cpu_single_step(0)='1' and cpu_single_step(1)='0') 
 							or flashLoading = '1' else '0'; -- issue DMA request
-	DEBUG1 <= go_write;
+	--DEBUG1 <= go_write;
 
 	go_write <= '1' when wr_sampler = "1000" else '0'; -- wr_sampler = "1110" else '0';
 	go_cruclk <= '1' when cruclk_sampler(1 downto 0) = "01" else '0';
@@ -1022,6 +954,7 @@ begin
 --	conl_led1 <= cru1100;
 --	conl_led2 <= alatch_counter(19);
 	
+	vdp_data_out(7 downto 0) <= x"00";
 	data_to_cpu <= 
 		vdp_data_out         			when sams_regs(6)='0' and cpu_addr(15 downto 10) = "100010" else	-- 10001000..10001011 (8800..8BFF)
 		grom_data_out & x"00" 			when sams_regs(6)='0' and cpu_addr(15 downto 8) = x"98" and cpu_addr(1)='1' else	-- GROM address read
@@ -1036,28 +969,39 @@ begin
 		--	x"0000"							when translated_addr(15 downto 6) /= "0000000000" else -- paged memory limited to 256K for now
 		sram_16bit_read_bus(15 downto 0);		-- data to CPU
 	
- 	vdp: entity work.tms9918
-		port map(
-		clk 		=> clk,		
-		reset 	=> real_reset_n,	
-		mode 		=> cpu_addr(1),
-		addr		=> cpu_addr(8 downto 1),
-		data_in 	=> data_from_cpu(15 downto 8),
-		data_out => vdp_data_out,
-		wr 		=> vdp_wr,	
-		rd 		=> vdp_rd,
-		vga_vsync	 => vga_vsync_int,
-		vga_hsync	 => vga_hsync_int,
-		debug1		=> vdp_debug1,
-		debug2		=> vdp_debug2,
-		vga_red 		 => VGA_RED,
-		vga_green	 => VGA_GREEN,
-		vga_blue		 => VGA_BLUE,
-		int_out	=> vdp_interrupt
-		);			
-		
-	VGA_VSYNC <= vga_vsync_int;
-	VGA_HSYNC <= vga_hsync_int;
+  -----------------------------------------------------------------------------
+  -- TMS9928A Video Display Processor
+  -----------------------------------------------------------------------------
+  vdp18_b : vdp18_core
+    generic map (
+      is_pal_g      => is_pal_g,
+      compat_rgb_g  => compat_rgb_g
+    )
+    port map (
+      clk_i         => clk_i,
+      clk_en_10m7_i => clk_en_10m7_i,
+      reset_n_i     => real_reset,--
+      csr_n_i       => not vdp_rd,--
+      csw_n_i       => not vdp_wr,--
+      mode_i        => cpu_addr(1),
+      int_n_o       => vdp_interrupt,--
+      cd_i          => data_from_cpu(15 downto 8),--
+      cd_o          => vdp_data_out(15 downto 8),--
+      vram_we_o     => vram_we_o,
+      vram_a_o      => vram_a_o,
+      vram_d_o      => vram_d_o,
+      vram_d_i      => vram_d_i,
+      col_o         => col_o,
+      rgb_r_o       => rgb_r_o,
+      rgb_g_o       => rgb_g_o,
+      rgb_b_o       => rgb_b_o,
+      hsync_n_o     => hsync_n_o,
+      vsync_n_o     => vsync_n_o,
+      blank_n_o     => blank_n_o,
+      hblank_o      => hblank_o,
+      vblank_o      => vblank_o,
+      comp_sync_n_o => comp_sync_n_o
+    );
 	
 	-- GROM implementation - GROM's are mapped to external RAM
 	extbasgrom : entity work.gromext port map (
@@ -1072,24 +1016,24 @@ begin
 			addr 		=> grom_ram_addr
 		);
 
-	-- sound chip implementation
-	TMS9919_CHIP: entity work.tms9919 port map (
-			clk 		=> clk,
-			reset		=> real_reset_n,
-			data_in 	=> data_from_cpu(15 downto 8),
-			we			=> tms9919_we,
-			dac_out	=> dac_data
-		);
-		
-	MY_DAC : entity work.dac port map (
-			clk_i   	=> clk,
-         res_n_i 	=> real_reset_n,
-         dac_i   	=> dac_data,
-         dac_o   	=> dac_out_bit
-		);
-		
-	AUDIO_L <= dac_out_bit;
-	AUDIO_R <= dac_out_bit;
+  -----------------------------------------------------------------------------
+  -- SN76489 Programmable Sound Generator
+  -----------------------------------------------------------------------------
+  psg_b : sn76489_top
+    generic map (
+      clock_div_16_g => 1
+    )
+    port map (
+      clock_i    => clk_i,
+      clock_en_i => clk_en_3m58_s,
+      res_n_i    => real_reset,--
+      ce_n_i     => not tms9919_we,--
+      we_n_i     => not tms9919_we,--
+      ready_o    => psg_ready_s,--
+      d_i        => audio_data_out,--
+      aout_o     => audio_o
+    );
+
 	
 	-- memory paging unit implementation
 	paging_regs_visible 	<= sams_regs(0);			-- 1E00 in CRU space
@@ -1149,39 +1093,6 @@ begin
 			 scratch_en => '0',
           stuck => cpu_stuck
         );
-		  
-	process(clk) 
-	begin
-		if rising_edge(clk) then
-			clk8_divider <= clk8_divider + 1;
-			if clk8_divider = 5 then
-				clk8 <= not clk8;
-				clk8_divider <= 0;
-			end if;
-		end if;
-	end process;
 		
-   FLASH_WP <= '1';
-	FLASH_HOLD <= '1';
-	serial_flash_rom : flash PORT MAP (
-				clk8 			=> clk8,
-				n_reset 		=> funky_reset(funky_reset'length-1),
-				bad_load 	=> '0',
-				load_disk 	=> '0',
-				disk			=> "0000",
-				dioBusControl => '1',
-				romLoaded 	=> romLoaded,
-				diskLoaded 	=> open,
-				memoryDataOut => flashDataOut,
-				memoryAddr 	=> flashAddrOut,
-				n_ramWE 		=> flashRamWE_n,
-				loading 		=> flashLoading,
-				spi_sclk 	=> FLASH_CK,
-				spi_ss 		=> FLASH_CS,
-				spi_mosi 	=> FLASH_SI,
-				spi_miso 	=> FLASH_SO
-			);
-		
-			
 end Behavioral;
 

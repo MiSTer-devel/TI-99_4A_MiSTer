@@ -20,68 +20,57 @@
 library IEEE;
 use IEEE.STD_LOGIC_1164.ALL;
 
--- Uncomment the following library declaration if using
--- arithmetic functions with Signed or Unsigned values
---use IEEE.NUMERIC_STD.ALL;
+LIBRARY altera_mf;
+USE altera_mf.altera_mf_components.all;
 
-Library UNISIM;
-use UNISIM.vcomponents.all;
-
-Library UNIMACRO;
-use UNIMACRO.vcomponents.all;
-
-entity scratchpad is
-    Port ( addr : in  STD_LOGIC_VECTOR (7 downto 1);
-           din  : in  STD_LOGIC_VECTOR (15 downto 0);
-           dout : out  STD_LOGIC_VECTOR (15 downto 0);
-           clk  : in  STD_LOGIC;
-           wr   : in  STD_LOGIC);
-end scratchpad;
-
-architecture Behavioral of scratchpad is
---	signal we : std_logic_vector(1 downto 0);
-	signal dip : std_logic_vector(1 downto 0);
-	signal ram_addr : std_logic_vector(9 downto 0);
-begin
-	dip <= "00";
-	ram_addr <= "000" & addr;
-
-	small_ram : RAMB16_S18 port map(
-		do => dout,
-		dop => open,
-		addr => ram_addr,
-		clk => clk,
-		di => din,
-		dip => "00",
-		en => '1',
-		ssr => '0', 
-		we => wr);
+ENTITY scratchpad IS
+	GENERIC
+	(
+		widthad_a			: natural := 7;
+		width_a				: natural := 16;
+		outdata_reg_a : string := "UNREGISTERED"
+	);
+	PORT
+	(
+		addr	: IN STD_LOGIC_VECTOR (widthad_a-1 DOWNTO 0);
+		clk		: IN STD_LOGIC ;
+		din		: IN STD_LOGIC_VECTOR (width_a-1 DOWNTO 0);
+		wr		: IN STD_LOGIC ;
+		dout			: OUT STD_LOGIC_VECTOR (width_a-1 DOWNTO 0)
+	);
+END scratchpad;
 
 
---	we <= wr & wr;
--- 
---   BRAM_SINGLE_MACRO_inst : BRAM_SINGLE_MACRO
---   generic map (
---      BRAM_SIZE => "18Kb", -- Target BRAM, "9Kb" or "18Kb" 
---      DEVICE => "SPARTAN6", -- Target Device: "VIRTEX5", "VIRTEX6", "SPARTAN6" 
---      DO_REG => 0, -- Optional output register (0 or 1)
---      INIT => X"000000000",   --  Initial values on output port
---      INIT_FILE => "NONE",
---      WRITE_WIDTH => 16,   -- Valid values are 1-36 (19-36 only valid when BRAM_SIZE="18Kb")
---      READ_WIDTH => 16,   -- Valid values are 1-36 (19-36 only valid when BRAM_SIZE="18Kb")
---      SRVAL => X"000000000",   -- Set/Reset value for port output
---      WRITE_MODE => "WRITE_FIRST" -- "WRITE_FIRST", "READ_FIRST" or "NO_CHANGE" 
---	 )
---    port map (
---      DO => dout,      -- Output data, width defined by READ_WIDTH parameter
---      ADDR => "000" & addr,  -- Input address, width defined by read/write port depth
---      CLK => clk,    -- 1-bit input clock
---      DI => din,      -- Input data port, width defined by WRITE_WIDTH parameter
---      EN => en,      -- 1-bit input RAM enable
---      REGCE => '0', -- 1-bit input output register enable
---      RST => '0',    -- 1-bit input reset
---      WE => we       -- Input write enable, width defined by write port depth
---   );
+ARCHITECTURE SYN OF scratchpad IS
 
-end Behavioral;
+	SIGNAL sub_wire0	: STD_LOGIC_VECTOR (width_a-1 DOWNTO 0);
+
+BEGIN
+	dout    <= sub_wire0(width_a-1 DOWNTO 0);
+
+	altsyncram_component : altsyncram
+	GENERIC MAP (
+		clock_enable_input_a => "BYPASS",
+		clock_enable_output_a => "BYPASS",
+		intended_device_family => "Cyclone III",
+		lpm_hint => "ENABLE_RUNTIME_MOD=NO",
+		lpm_type => "altsyncram",
+		numwords_a => 2**widthad_a,
+		operation_mode => "SINGLE_PORT",
+		outdata_aclr_a => "NONE",
+		outdata_reg_a => outdata_reg_a,
+		power_up_uninitialized => "FALSE",
+		read_during_write_mode_port_a => "NEW_DATA_NO_NBE_READ",
+		widthad_a => widthad_a,
+		width_a => width_a,
+		width_byteena_a => 1
+	)
+	PORT MAP (
+		wren_a => wr,
+		clock0 => clk,
+		address_a => addr,
+		data_a => din,
+		q_a => sub_wire0
+	);
+END SYN;
 
