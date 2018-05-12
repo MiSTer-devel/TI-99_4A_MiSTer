@@ -331,7 +331,8 @@ wire [7:0] R,G,B;
 wire hblank, vblank;
 wire hsync, vsync;
 
-wire [15:0] keyboardSignals;
+wire [7:0] keyboardSignals_i;
+wire [7:0] keyboardSignals_o;
 
 ep994a console
 (
@@ -341,7 +342,8 @@ ep994a console
 	.por_n_o(),
 
 	// GPIO port
-	.epGPIO(keyboardSignals),
+	.epGPIO_o(keyboardSignals_i),
+	.epGPIO_i(keyboardSignals_o),
 	// GPIO 0..7  = IO1P..IO8P - these are the keyboard row strobes.
 	// GPIO 8..15 = IO1N..IO8N - these are key input signals.
 
@@ -559,14 +561,14 @@ wire [7:0] keys4 = {btn_fn, btn_2,  btn_3,  btn_4,  btn_5,  btn_1,  m_up,    m_u
 wire [7:0] keys5 = {btn_ls, btn_s,  btn_d,  btn_f,  btn_g,  btn_a,  1'b0,      1'b0};        // last=
 wire [7:0] keys6 = {btn_ct, btn_w,  btn_e,  btn_r,  btn_t,  btn_q,  1'b0,      1'b0};        // last=
 wire [7:0] keys7 = {1'b0,   btn_x,  btn_c,  btn_v,  btn_b,  btn_z,  1'b0,      1'b0};        // last=
-wire [7:0] keyboardSelect = '{~keyboardSignals[4],
-                              ~keyboardSignals[5],
-                              ~keyboardSignals[6],
-                              ~keyboardSignals[7],
-                              ~keyboardSignals[3],
-                              ~keyboardSignals[2],
-                              ~keyboardSignals[1],
-										~keyboardSignals[0]};
+wire [7:0] keyboardSelect = '{~keyboardSignals_i[4],
+                              ~keyboardSignals_i[5],
+                              ~keyboardSignals_i[6],
+                              ~keyboardSignals_i[7],
+                              ~keyboardSignals_i[3],
+                              ~keyboardSignals_i[2],
+                              ~keyboardSignals_i[1],
+										~keyboardSignals_i[0]};
 wire [7:0] keys = '{~|(keys7 & keyboardSelect[7:0]),
                     ~|(keys6 & keyboardSelect[7:0]),
                     ~|(keys5 & keyboardSelect[7:0]),
@@ -577,7 +579,9 @@ wire [7:0] keys = '{~|(keys7 & keyboardSelect[7:0]),
                     ~|(keys0 & keyboardSelect[7:0])
 						  };
 
-assign keyboardSignals[15:8] = keys[7:0];
-assign keyboardSignals[7:0] = 'Z;
+//assign keyboardSignals[15:8] = keys[7:0];
+//assign keyboardSignals[7:0] = 'Z;
+assign keyboardSignals_o[7:0] = keys[7:0];
+//assign keyboardSignalsi[7:0] = 'Z;
 
 endmodule

@@ -25,7 +25,7 @@ module multiplier (
 	  old_a <= a;
 	  old_b <= b;
 	  shift_a <= a;
-    end else if (bindex < 18'h40000) begin
+    end else if (bindex < 19'h40000) begin
 	  product <= product + ((bindex & old_b) ? shift_a : 0);
 	  bindex <= bindex << 1;
 	  shift_a <= shift_a << 1;

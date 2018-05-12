@@ -69,7 +69,8 @@ entity ep994a is
     por_n_o         : out std_logic;
     -- Controller Interface ---------------------------------------------------
 			  -- GPIO port
-			  epGPIO		 : inout std_logic_vector(15 downto 0);
+			  epGPIO_i		 : in std_logic_vector(7 downto 0);
+			  epGPIO_o		 : out std_logic_vector(7 downto 0);
 				-- GPIO 0..7  = IO1P..IO8P - these are the keyboard row strobes.
 				-- GPIO 8..15 = IO1N..IO8N - these are key input signals.
     -- BIOS ROM Interface -----------------------------------------------------
@@ -461,7 +462,7 @@ begin
 	
 	-------------------------------------
 	-- key matrix support
-	epGPIO(15 downto 8) <= "ZZZZZZZZ";	-- IO1N..IO8N are inputs
+	--epGPIO(15 downto 8) <= "ZZZZZZZZ";	-- IO1N..IO8N are inputs
 	-- KBD connector signals
 	-- 15 | IO8P | col#3
 	-- 14 | IO7P | col#2	
@@ -471,14 +472,14 @@ begin
 	--  8 | IO3P | col#5
 	--epGPIO(1 downto 0) <= "ZZ";	-- unused
 	-- For the column decoder, rely on pull-ups to bring the row selectors high
-	epGPIO(7) <= '0' when cru9901(20 downto 18) = "011" else 'Z'; 	-- col#3
-	epGPIO(6) <= '0' when cru9901(20 downto 18) = "010" else 'Z'; 	-- col#2
-	epGPIO(5) <= '0' when cru9901(20 downto 18) = "001" else 'Z'; 	-- col#1
-	epGPIO(4) <= '0' when cru9901(20 downto 18) = "000" else 'Z'; 	-- col#0
-	epGPIO(3) <= '0' when cru9901(20 downto 18) = "100" else 'Z'; 	-- col#4
-	epGPIO(2) <= '0' when cru9901(20 downto 18) = "101" else 'Z'; 	-- col#5
-	epGPIO(1) <= '0' when cru9901(20 downto 18) = "110" else 'Z'; 	-- col#6
-	epGPIO(0) <= '0' when cru9901(20 downto 18) = "111" else 'Z'; 	-- col#7
+	epGPIO_o(7) <= '0' when cru9901(20 downto 18) = "011" else '1'; 	-- col#3
+	epGPIO_o(6) <= '0' when cru9901(20 downto 18) = "010" else '1'; 	-- col#2
+	epGPIO_o(5) <= '0' when cru9901(20 downto 18) = "001" else '1'; 	-- col#1
+	epGPIO_o(4) <= '0' when cru9901(20 downto 18) = "000" else '1'; 	-- col#0
+	epGPIO_o(3) <= '0' when cru9901(20 downto 18) = "100" else '1'; 	-- col#4
+	epGPIO_o(2) <= '0' when cru9901(20 downto 18) = "101" else '1'; 	-- col#5
+	epGPIO_o(1) <= '0' when cru9901(20 downto 18) = "110" else '1'; 	-- col#6
+	epGPIO_o(0) <= '0' when cru9901(20 downto 18) = "111" else '1'; 	-- col#7
 	-------------------------------------
 	
 	switch <= not reset_n_s;
@@ -913,14 +914,14 @@ begin
 					ki := to_integer(unsigned(cpu_addr(3 downto 1))) - 3; -- row select on address
 --					cru_read_bit <= keyboard(to_integer(unsigned(cru9901(20 downto 18))), ki); -- column select on multiplexor select
 					case ki is
-						when 0 => cru_read_bit <= epGPIO(8);
-						when 1 => cru_read_bit <= epGPIO(9);
-						when 2 => cru_read_bit <= epGPIO(10);
-						when 3 => cru_read_bit <= epGPIO(11);
-						when 4 => cru_read_bit <= epGPIO(12);
-						when 5 => cru_read_bit <= epGPIO(13);
-						when 6 => cru_read_bit <= epGPIO(14);
-						when 7 => cru_read_bit <= epGPIO(15);
+						when 0 => cru_read_bit <= epGPIO_i(0);
+						when 1 => cru_read_bit <= epGPIO_i(1);
+						when 2 => cru_read_bit <= epGPIO_i(2);
+						when 3 => cru_read_bit <= epGPIO_i(3);
+						when 4 => cru_read_bit <= epGPIO_i(4);
+						when 5 => cru_read_bit <= epGPIO_i(5);
+						when 6 => cru_read_bit <= epGPIO_i(6);
+						when 7 => cru_read_bit <= epGPIO_i(7);
 					end case;
 					
 				elsif cpu_addr(15 downto 1) & '0' = x"0004" then
