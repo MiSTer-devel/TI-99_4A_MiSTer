@@ -125,6 +125,8 @@ parameter CONF_STR = {
 	"V,v1.00.",`BUILD_DATE
 };
 
+wire reset_osd = status[6];
+
 /////////////////  CLOCKS  ////////////////////////
 
 wire clk_sys;
@@ -192,7 +194,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 reg [7:0] download_reset_cnt;
 wire download_reset = download_reset_cnt != 0;
 always @(posedge CLK_50M) begin
-	if(ioctl_download) download_reset_cnt <= 8'd255;
+	if(ioctl_download || reset_osd) download_reset_cnt <= 8'd255;
 	else if(download_reset_cnt != 0) download_reset_cnt <= download_reset_cnt - 8'd1;
 end
 
@@ -203,7 +205,7 @@ always @(posedge CLK_50M) begin
 	else if(ioctl_download) init_reset <= 1'b0;
 end
 
-wire reset = (init_reset || buttons[1] || RESET);// || download_reset );
+wire reset = (init_reset || buttons[1] || RESET || reset_osd);// || download_reset );
 
 /////////////////  Memory  ////////////////////////
 wire [24:0] memory_addr;       // 25 bit byte address
@@ -331,7 +333,7 @@ wire [7:0] R,G,B;
 wire hblank, vblank;
 wire hsync, vsync;
 
-wire [7:0] keyboardSignals_i;
+wire [8:0] keyboardSignals_i;
 wire [7:0] keyboardSignals_o;
 
 ep994a console
@@ -375,7 +377,7 @@ ep994a console
 
 	.audio_o(audio),
 	
-	.flashloading_i(ioctl_download)// || init_reset)
+	.flashloading_i(download_reset)
 );
 
 video_mixer #(.LINE_LENGTH(290)) video_mixer
@@ -432,7 +434,7 @@ always @(posedge clk_sys) begin
 			'hX45: btn_0     <= pressed; // 0
 			'hX4E: btn_eq    <= pressed; // - => =
 			'hX55: btn_eq    <= pressed; // =
-			'hX5D: btn_bs    <= pressed; // \
+			'hX5D: btn_eq    <= pressed; // \ => =
 
 			'hX15: btn_q     <= pressed; // q
 			'hX1D: btn_w     <= pressed; // w
@@ -444,7 +446,7 @@ always @(posedge clk_sys) begin
 			'hX43: btn_i     <= pressed; // i
 			'hX44: btn_o     <= pressed; // o
 			'hX4D: btn_p     <= pressed; // p
-			'hX54: btn_bs    <= pressed; // [ => \
+			'hX54: btn_fs    <= pressed; // [ => /
 			
 			'hX1C: btn_a     <= pressed; // a
 			'hX1B: btn_s     <= pressed; // s
@@ -458,7 +460,7 @@ always @(posedge clk_sys) begin
 			'hX4C: btn_se    <= pressed; // ;
 			'hX5A: btn_en    <= pressed; // enter
 			
-			'hX12: btn_ls    <= pressed; // lshift
+			'hX12: btn_sh    <= pressed; // lshift
 			'hX1A: btn_z     <= pressed; // z
 			'hX22: btn_x     <= pressed; // x
 			'hX21: btn_c     <= pressed; // c
@@ -468,9 +470,9 @@ always @(posedge clk_sys) begin
 			'hX3A: btn_m     <= pressed; // m
 			'hX41: btn_co    <= pressed; // ,
 			'hX49: btn_pe    <= pressed; // .
-			'hX59: btn_rs    <= pressed; // rshift
+			'hX59: btn_sh    <= pressed; // rshift
 
-			'hX58: btn_al    <= pressed; // caps => alpha lock
+			'hX58: btn_al    <= (~btn_al & pressed) | (btn_al & ~pressed); // caps => alpha lock
 			'hX14: btn_ct    <= pressed; // lctrl
 			'hX29: btn_sp    <= pressed; // space
 			'hX11: btn_fn    <= pressed; // lalt => fn
@@ -501,7 +503,7 @@ reg btn_u = 0;
 reg btn_i = 0;
 reg btn_o = 0;
 reg btn_p = 0;
-reg btn_bs = 0;
+reg btn_fs = 0;
 			
 reg btn_a = 0;
 reg btn_s = 0;
@@ -515,7 +517,7 @@ reg btn_l = 0;
 reg btn_se = 0;
 reg btn_en = 0;
 			
-reg btn_ls = 0;
+reg btn_sh = 0;
 reg btn_z = 0;
 reg btn_x = 0;
 reg btn_c = 0;
@@ -525,7 +527,6 @@ reg btn_n = 0;
 reg btn_m = 0;
 reg btn_co = 0;
 reg btn_pe = 0;
-reg btn_rs = 0;
 
 reg btn_al = 0;
 reg btn_ct = 0;
@@ -538,6 +539,11 @@ reg btn_left  = 0;
 reg btn_right = 0;
 reg btn_fire  = 0;
 
+wire m_right2  = joyb[0];
+wire m_left2   = joyb[1];
+wire m_down2   = joyb[2];
+wire m_up2     = joyb[3];
+wire m_fire2   = joyb[4];
 wire m_right  = btn_right | joya[0];
 wire m_left   = btn_left  | joya[1];
 wire m_down   = btn_down  | joya[2];
@@ -553,14 +559,14 @@ wire m_fire   = btn_fire  | joya[4];
 //wire m_pt     = btn_pt    | joya[12];
 //wire m_bt     = btn_bt    | joya[13];
 
-wire [7:0] keys0 = {btn_eq, btn_pe, btn_co, btn_m,  btn_n,  btn_rs, m_fire,  m_fire};        // last=fire2
-wire [7:0] keys1 = {btn_sp, btn_l,  btn_k,  btn_j,  btn_h,  btn_se, m_left,  m_left};        // last=left2
-wire [7:0] keys2 = {btn_en, btn_o,  btn_i,  btn_u,  btn_y,  btn_p,  m_right, m_right};       // last=right2
-wire [7:0] keys3 = {1'b0,   btn_9,  btn_8,  btn_7,  btn_6,  btn_0,  m_down,  m_down};        // last=down2
-wire [7:0] keys4 = {btn_fn, btn_2,  btn_3,  btn_4,  btn_5,  btn_1,  m_up,    m_up | btn_al}; // last=up2/al
-wire [7:0] keys5 = {btn_ls, btn_s,  btn_d,  btn_f,  btn_g,  btn_a,  1'b0,      1'b0};        // last=
-wire [7:0] keys6 = {btn_ct, btn_w,  btn_e,  btn_r,  btn_t,  btn_q,  1'b0,      1'b0};        // last=
-wire [7:0] keys7 = {1'b0,   btn_x,  btn_c,  btn_v,  btn_b,  btn_z,  1'b0,      1'b0};        // last=
+wire [7:0] keys0 = {btn_eq, btn_pe, btn_co, btn_m,  btn_n,  btn_fs, m_fire,  m_fire2};        // last=fire2
+wire [7:0] keys1 = {btn_sp, btn_l,  btn_k,  btn_j,  btn_h,  btn_se, m_left,  m_left2};        // last=left2
+wire [7:0] keys2 = {btn_en, btn_o,  btn_i,  btn_u,  btn_y,  btn_p,  m_right, m_right2};       // last=right2
+wire [7:0] keys3 = {1'b0,   btn_9,  btn_8,  btn_7,  btn_6,  btn_0,  m_down,  m_down2};        // last=down2
+wire [7:0] keys4 = {btn_fn, btn_2,  btn_3,  btn_4,  btn_5,  btn_1,  m_up,    m_up2};          // last=up2/al
+wire [7:0] keys5 = {btn_sh, btn_s,  btn_d,  btn_f,  btn_g,  btn_a,  1'b0,      1'b0};         // last=
+wire [7:0] keys6 = {btn_ct, btn_w,  btn_e,  btn_r,  btn_t,  btn_q,  1'b0,      1'b0};         // last=
+wire [7:0] keys7 = {1'b0,   btn_x,  btn_c,  btn_v,  btn_b,  btn_z,  1'b0,      1'b0};         // last=
 wire [7:0] keyboardSelect = '{~keyboardSignals_i[4],
                               ~keyboardSignals_i[5],
                               ~keyboardSignals_i[6],
@@ -572,7 +578,7 @@ wire [7:0] keyboardSelect = '{~keyboardSignals_i[4],
 wire [7:0] keys = '{~|(keys7 & keyboardSelect[7:0]),
                     ~|(keys6 & keyboardSelect[7:0]),
                     ~|(keys5 & keyboardSelect[7:0]),
-                    ~|(keys4 & keyboardSelect[7:0]),
+                    ~(|(keys4 & keyboardSelect[7:0]) | (btn_al & ~keyboardSignals_i[8])),
                     ~|(keys3 & keyboardSelect[7:0]),
                     ~|(keys2 & keyboardSelect[7:0]),
                     ~|(keys1 & keyboardSelect[7:0]),

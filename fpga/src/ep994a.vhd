@@ -70,7 +70,7 @@ entity ep994a is
     -- Controller Interface ---------------------------------------------------
 			  -- GPIO port
 			  epGPIO_i		 : in std_logic_vector(7 downto 0);
-			  epGPIO_o		 : out std_logic_vector(7 downto 0);
+			  epGPIO_o		 : out std_logic_vector(8 downto 0);
 				-- GPIO 0..7  = IO1P..IO8P - these are the keyboard row strobes.
 				-- GPIO 8..15 = IO1N..IO8N - these are key input signals.
     -- BIOS ROM Interface -----------------------------------------------------
@@ -472,6 +472,7 @@ begin
 	--  8 | IO3P | col#5
 	--epGPIO(1 downto 0) <= "ZZ";	-- unused
 	-- For the column decoder, rely on pull-ups to bring the row selectors high
+	epGPIO_o(8) <= cru9901(21); 	-- alpha-lock
 	epGPIO_o(7) <= '0' when cru9901(20 downto 18) = "011" else '1'; 	-- col#3
 	epGPIO_o(6) <= '0' when cru9901(20 downto 18) = "010" else '1'; 	-- col#2
 	epGPIO_o(5) <= '0' when cru9901(20 downto 18) = "001" else '1'; 	-- col#1
