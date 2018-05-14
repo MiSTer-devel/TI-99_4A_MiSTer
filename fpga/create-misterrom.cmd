@@ -22,5 +22,5 @@ REM -- 3) Last 64K are written to B0000 i.e. our DSR ROM and ROM area.
 
 
 REM -- let's do here extended BASIC and normal
-REM  |--- here is 64K module ROM section               ---|   |--- here is 64K GROM section                                     ---|   |--- here is 64K ROM section                                                                          ---|
-copy /B ..\firmware\TI-InvaC.Bin + /B hole8k + /B hole48k + /B ..\firmware\994AGROM-EP.Bin + /B ..\firmware\TI-InvaG.Bin + /B hole32k + /B ..\firmware\diskdsr_4000_padded8k.bin + /B hole32k + /B ..\firmware\994aROM.Bin + /B hole8k + /B hole8k tiroms.bin
+REM  |--- 64K module ROM section   ---|   |--- here is 64K GROM section                      ---|   |--- here is 64K ROM section                                           ---|
+copy /B hole8k + /B hole8k + /B hole48k + /B ..\firmware\994AGROM-EP.Bin + /B hole8k + /B hole32k + /B hole8k + /B hole32k + /B ..\firmware\994aROM.Bin + /B hole8k + /B hole8k tiroms.bin

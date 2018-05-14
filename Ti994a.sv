@@ -111,9 +111,9 @@ wire [1:0] scale = status[8:7];
 `include "build_id.v" 
 parameter CONF_STR = {
 	"TI-99_4A;;",
-	"-;",
-	"F,BIN;",
-	"-;",
+	"F,BIN,Load Full or C.bin;",
+	"F,BIN,Load D.bin;",
+	"F,BIN,Load G.bin;",
 	"O1,Aspect ratio,4:3,16:9;",
 	"O78,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"-;",
@@ -266,6 +266,11 @@ wire  [15:0] ram_di;
 wire  [15:0] ram_do;
 wire  [1:0] ram_be_n;
 
+wire  [17:0] download_addr;
+assign download_addr[0] = ~ioctl_addr[0]; //endian fix
+// ioctl_index={1=Full/C.bin=0,2=D.bin=h2000>>1=h1000,3=G.bin=h16000>>1=hB000}
+assign download_addr[17:1] = ioctl_addr[17:1] + (ioctl_index[1] ? (ioctl_index[0] ? 'hB000 : 'h1000): 'h0000);
+
 dpram16_8 #(17) ram
 (
 	.clock(clk_sys),
@@ -276,7 +281,7 @@ dpram16_8 #(17) ram
 	.byteena_a(~ram_be_n),
 
 	.wren_b(ioctl_wr && !ioctl_addr[24:18]),
-	.address_b({ioctl_addr[17:1], ~ioctl_addr[0]}),
+	.address_b(download_addr),
 	.data_b(ioctl_dout),
 );
 
