@@ -357,7 +357,7 @@ set_global_assignment -name CDF_FILE jtag.cdf
 set_global_assignment -name QIP_FILE sys/sys.qip
 set_global_assignment -name VHDL_FILE dpram16_8.vhd
 set_global_assignment -name VHDL_FILE spram.vhd
-set_global_assignment -name VERILOG_FILE sdram.v
+set_global_assignment -name SYSTEMVERILOG_FILE sdram.sv
 set_global_assignment -name VHDL_FILE "sn76489/sn76489_comp_pack-p.vhd"
 set_global_assignment -name VHDL_FILE sn76489/sn76489_clock_div.vhd
 set_global_assignment -name VHDL_FILE sn76489/sn76489_latch_ctrl.vhd
@@ -385,5 +385,6 @@ set_global_assignment -name VHDL_FILE "fpga/src/gromext.vhd"
 set_global_assignment -name VHDL_FILE "fpga/src/pager612.vhd"
 set_global_assignment -name VHDL_FILE "fpga/src/scratchpad.vhd"
 set_global_assignment -name VHDL_FILE "fpga/src/tms9900.vhd"
+set_global_assignment -name VHDL_FILE "fpga/src/tms9919.vhd"
 set_global_assignment -name SYSTEMVERILOG_FILE Ti994a.sv
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

@@ -31,6 +31,9 @@ use IEEE.NUMERIC_STD.ALL;
 --use UNISIM.VComponents.all;
 
 entity tms9919 is
+  generic (
+    divider_g : integer := 446
+  );
     Port ( clk 		: in  STD_LOGIC;	-- 100MHz clock
            reset 		: in  STD_LOGIC;	-- reset active high
            we 			: in  STD_LOGIC;	-- high for one clock for a write to sound chip
@@ -145,7 +148,7 @@ begin
 			-- That gives a clock of 111857Hz which is good enough.
 			-- After checking that actually yields half of the desired frequency. So let's go with 447.
 			master_divider <= master_divider + 1;
-			if master_divider >= 446 then
+			if master_divider >= divider_g then
 				master_divider <= 0;
 				tone1_counter <= std_logic_vector(to_unsigned(to_integer(unsigned(tone1_counter)) - 1, tone1_counter'length));
 				tone2_counter <= std_logic_vector(to_unsigned(to_integer(unsigned(tone2_counter)) - 1, tone2_counter'length));
