@@ -117,6 +117,7 @@ entity ep994a is
 			  --SWI       : in std_logic_vector(7 downto 0);
 			  -- SWI 0: when set, CPU will automatically be taken out of reset after copying FLASH to RAM.
 			  
+	rom_mask_i       : in std_logic;
 	flashloading_i   : in std_logic
 );
 
@@ -427,7 +428,9 @@ begin
 	cpu_ram_be_n_o	<= "00" when cpu_access = '1' else -- or flashLoading = '1' else	-- TMS99105 is always 16-bit, use CE 
 						--"10" when mem_addr(0) = '1' else	-- lowest byte
 						"01";										-- second lowest byte
-	cpu_ram_a_o(14 downto 0)	<= sram_addr_bus(14 downto 0);	-- sram_addr_bus(0) selects between the two chips
+	cpu_ram_a_o(12 downto 0)	<= sram_addr_bus(12 downto 0);	-- sram_addr_bus(0) selects between the two chips
+	cpu_ram_a_o(14 downto 13)	<= sram_addr_bus(14 downto 13) when (rom_mask_i='0' or sram_addr_bus(18)='1') else
+						"00";	-- Mask Cart ROM when using *D.bin
 	cpu_ram_a_o(16 downto 15)	<= "00" when sram_addr_bus(18) = '0' else      --  Cart Rom                        0x00000-7FFFF all four of these are mirrored across 64KB
 						"11" when sram_addr_bus(17) = '1' else --  SRAM                            0xC0000-FFFFF
 						"01" when sram_addr_bus(16) = '0' else --  GROM                            0x80000-9FFFF

@@ -267,9 +267,11 @@ wire  [15:0] ram_do;
 wire  [1:0] ram_be_n;
 
 wire  [17:0] download_addr;
+wire rom_mask;
 assign download_addr[0] = ~ioctl_addr[0]; //endian fix
 // ioctl_index={1=Full/C.bin=0,2=D.bin=h2000>>1=h1000,3=G.bin=h16000>>1=hB000}
 assign download_addr[17:1] = ioctl_addr[17:1] + (ioctl_index[1] ? (ioctl_index[0] ? 'hB000 : 'h1000): 'h0000);
+assign rom_mask = ~ioctl_index[0];
 
 dpram16_8 #(17) ram
 (
@@ -382,6 +384,7 @@ ep994a console
 
 	.audio_o(audio),
 	
+	.rom_mask_i(rom_mask),
 	.flashloading_i(download_reset)
 );
 
