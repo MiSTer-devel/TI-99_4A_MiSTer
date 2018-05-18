@@ -1316,6 +1316,7 @@ begin
 							st(11) <= '1';	 -- overflow
 							cpu_state <= do_fetch;	-- done
 						else
+						delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(92*cycle_clks_g, 16));
 							-- fetch the 2nd word of the dividend, first calculate it's address
 							dividend(31 downto 16) <= rd_dat;	-- store the high word
 							arg1 <= x"0002";
@@ -1329,8 +1330,7 @@ begin
 						shift_count <= "10000"; -- 16
 						cpu_state <= do_div2;
 					when do_div2 =>
-						--delay_ir_wait is not accurate could be between 92 and 124
-						delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(92*cycle_clks_g, 16));
+						delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(2*cycle_clks_g, 16));
 						dividend(31 downto 0) <= dividend(30 downto 0) & '0'; -- shift left
 						arg1 <= dividend(30 downto 15);	-- shifted data to ALU too
 						arg2 <= reg_t;
