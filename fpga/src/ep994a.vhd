@@ -334,6 +334,7 @@ architecture Behavioral of ep994a is
 	signal wait_clock : boolean := false;
 -------------------------------------------------------------------------------	
     COMPONENT tms9900
+	 GENERIC (cycle_clks_g : integer);
     PORT(
          clk : IN  std_logic;
          reset : IN  std_logic;
@@ -1087,7 +1088,11 @@ begin
 	cpu_cruin <= cru_read_bit;
 	cpu_int_req <= not conl_int and cpu_reset_ctrl(2);	-- cpu_reset_ctrl(2), when cleared, allows us to mask interrupts
 	
-	cpu : tms9900 PORT MAP (
+	cpu : tms9900
+		generic map (
+			cycle_clks_g => 14
+		)
+	PORT MAP (
           clk => clk,
           reset => cpu_reset,
           addr_out => cpu_addr,

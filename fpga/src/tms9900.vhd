@@ -33,7 +33,11 @@ use IEEE.NUMERIC_STD.ALL;
 -- simulation end
 
 
-entity tms9900 is Port ( 
+entity tms9900 is 
+  generic (
+    cycle_clks_g  : integer := 0
+  );
+	Port ( 
 	clk 		: in  STD_LOGIC;		-- input clock
 	reset 	: in  STD_LOGIC;		-- reset, active high
 	addr_out	: out  STD_LOGIC_VECTOR (15 downto 0);
@@ -132,6 +136,8 @@ architecture Behavioral of tms9900 is
 	signal alu_result :  std_logic_vector(15 downto 0);
 	signal shift_count : std_logic_vector(4 downto 0);
 	signal delay_count : std_logic_vector(7 downto 0);
+	signal delay_ir_count : std_logic_vector(15 downto 0);
+	signal delay_ir_wait : std_logic_vector(15 downto 0);
 	
 	type alu_operation_type is (
 		alu_load1, alu_load2, alu_add, alu_or, alu_and, alu_sub, alu_compare,
@@ -348,6 +354,7 @@ begin
 	variable offset : std_logic_vector(15 downto 0);
 	variable take_branch : boolean;
 	variable dec_shift_count   : boolean := False;
+	variable inc_ir_count   : boolean := True;
 	-- simulation begin
 --	variable my_line : line;	-- from textio
 	-- simulation end
@@ -371,10 +378,13 @@ begin
 			int_ack <= '0';
 			scratchpad_en <= '0';
 			scratchpad_wr <= '0';
+			delay_ir_count <= x"0000";
+			delay_ir_wait <= x"0000";
 		else
 			if rising_edge(clk) then
 			
 				dec_shift_count := False;
+				inc_ir_count := True;
 			
 				-- CPU state changes
 				case cpu_state is
@@ -496,7 +506,10 @@ begin
 					when do_fetch =>		-- instruction opcode fetch
 						if hold='1' then
 							holda <= '1';	-- honor DMA requests here - stay in do_fetch state
-						else
+						elsif delay_ir_wait <= delay_ir_count then -- wait for cycle counter
+							inc_ir_count := False;
+							delay_ir_count <= x"0000";
+							delay_ir_wait <= x"0000";
 							holda <= '0';
 							i_am_xop <= False;
 							-- check interrupt requests
@@ -551,6 +564,7 @@ begin
 							rd_dat(15 downto 13) = "111" or -- SOC, SOCB
 							rd_dat(15 downto 13) = "010" or -- SZC, SZCB
 							rd_dat(15 downto 13) = "110" then -- MOV, MOVB
+							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(14*cycle_clks_g, 16));
 							-- found dual operand instruction. Get source operand.
 							operand_mode <= rd_dat(5 downto 0);	-- ir not set at this point yet
 							if rd_dat(12) = '1' then
@@ -562,15 +576,18 @@ begin
 							cpu_state_operand_return <= do_dual_op;
 						elsif rd_dat(15 downto 12) = "0001" and 
 							rd_dat(11 downto 8) /= x"D" and rd_dat(11 downto 8) /= x"E" and rd_dat(11 downto 8) /= x"F" then
+							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(8*cycle_clks_g, 16));
 								cpu_state <= do_branch; 
 						elsif rd_dat(15 downto 10) = "000010" then -- SLA, SRA, SRC, SRL
 							-- Do all the shifts SLA(10) SRA(00) SRC(11) SRL(01), OPCODE:6 INS:2 C:4 W:4
+							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(12*cycle_clks_g, 16));
 							shift_count <= '0' & rd_dat(7 downto 4);
 							arg1 <= w;
 							arg2 <= x"00" & "000" & rd_dat(3 downto 0) & '0';
 							ope <= alu_add;	-- calculate workspace address
 							cpu_state <= do_shifts0;
 						elsif rd_dat = x"0380" then	-- RTWP
+							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(14*cycle_clks_g, 16));
 							arg1 <= w;
 							arg2 <= x"00" & "000" & x"D" & '0';	-- calculate of register 13 (WP)
 							ope <= alu_add;	
@@ -579,6 +596,7 @@ begin
 						   rd_dat(15 downto 8) = x"1D" or  --SBO
 							rd_dat(15 downto 8) = x"1E" or -- SBZ
 							rd_dat(15 downto 8) = x"1F" then	-- TB
+							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(12*cycle_clks_g, 16));
 --								test_out <= x"8877";
 							 arg1	<= w;
 							 arg2 <= x"00" & "000" & x"C" & '0';
@@ -586,9 +604,15 @@ begin
 							 cpu_state <= do_alu_read;	-- Read WR12
 							 cpu_state_next <= do_single_bit_cru0;
 						elsif rd_dat = x"0340" or rd_dat = x"0360" or rd_dat = x"03C0" or rd_dat = x"03A0" or rd_dat = x"03E0" then
+							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(12*cycle_clks_g, 16));
 							-- external instructions IDLE, RSET, CKOF, CKON, LREX
 							cpu_state <= do_ext_instructions;
 						elsif rd_dat(15 downto 4) = x"02C" or rd_dat(15 downto 4) = x"02A" then -- STST, STWP
+							if rd_dat(15 downto 4) = x"02C" then
+							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(8*cycle_clks_g, 16));
+							else
+							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(10*cycle_clks_g, 16));
+							end if;
 							arg1 <= w;
 							arg2 <= x"00" & "000" & rd_dat(3 downto 0) & '0';
 							ope <= alu_add;	-- calculate workspace address
@@ -596,15 +620,18 @@ begin
 						elsif rd_dat(15 downto 13) = "001" and rd_dat(12 downto 10) /= "100" and rd_dat(12 downto 10) /= "101" then
 							--	COC, CZC, XOR, MPY, DIV, XOP
 							if rd_dat(12 downto 10) = "011" then	-- XOP
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(36*cycle_clks_g, 16));
 								operand_mode <= rd_dat(5 downto 0);
 								cpu_state <= do_source_address0;
 								cpu_state_operand_return <= do_xop;
 							else
+								--delay_ir_wait done elsewhere
 								operand_mode <= rd_dat(5 downto 0);
 								cpu_state <= do_read_operand0;
 								cpu_state_operand_return <= do_coc_czc_etc0;
 							end if;
 						elsif rd_dat(15 downto 11) = "00110" then -- LDCR, STCR
+							--delay_ir_wait done elsewhere
 							-- set operand_word to byte mode if count of bits is 1..8
 							if rd_dat(9 downto 6) = "1000" or (rd_dat(9) = '0' and rd_dat(8 downto 6) /= "000") then
 								operand_word <= False;
@@ -621,10 +648,17 @@ begin
 									rd_dat(15 downto 4) = x"024" or rd_dat(15 downto 4) = x"026" or 	-- ANDI, ORI
 									rd_dat(15 downto 4) = x"028"													-- CI
 								then -- ANDI, ORI 
+								if rd_dat(15 downto 4) = x"020" then
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(12*cycle_clks_g, 16));
+								else
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(14*cycle_clks_g, 16));
+								end if;
 									cpu_state <= do_load_imm;	-- LI or AI
 						elsif rd_dat(15 downto 9) = "0000001" and rd_dat(4 downto 0) = "00000" then
+									--delay_ir_wait done elsewhere
 									cpu_state <= do_ir_imm;
 						elsif rd_dat(15 downto 10) = "000001" then 
+									--delay_ir_wait done elsewhere
 							-- Single operand instructions: BL, B, etc.
 							operand_word <= True;
 							operand_mode <= rd_dat(5 downto 0);
@@ -654,6 +688,7 @@ begin
 						when others => cpu_state <= do_stuck;
 						end case;
 						if take_branch then
+							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(2*cycle_clks_g, 16));
 							offset := ir(7) & ir(7) & ir(7) & ir(7) & ir(7) & ir(7) & ir(7) & ir(7 downto 0) & '0';
 							pc <= std_logic_vector(unsigned(offset) + unsigned(pc));
 						end if;
@@ -668,8 +703,10 @@ begin
 					when do_lwpi_limi =>	
 						cpu_state <= do_fetch;
 						if ir(8 downto 5) = "0111" then
+							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(10*cycle_clks_g, 16));
 							w <= rd_dat;	-- LWPI
 						else
+							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(16*cycle_clks_g, 16));
 							st(3 downto 0) <= rd_dat(3 downto 0);	-- LIMI
 						end if;
 						
@@ -831,9 +868,11 @@ begin
 						-- when we enter here source address is at the ALU output
 						case ir(9 downto 6) is 
 							when "0001" => -- B instruction
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(8*cycle_clks_g, 16));
 								pc <= alu_result;	-- the source address is our PC destination
 								cpu_state <= do_fetch;
 							when "1010" => -- BL instruction.Store old PC to R11 before returning.
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(12*cycle_clks_g, 16));
 								pc <= alu_result;	-- the source address is our PC destination
 								wr_dat <= pc;		-- capture old PC before to write data
 								arg1 <= w;
@@ -842,20 +881,24 @@ begin
 								cpu_state <= do_alu_write;
 								cpu_state_next <= do_fetch;
 							when "0011" => -- CLR instruction
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(10*cycle_clks_g, 16));
 								wr_dat <= x"0000";
 								cpu_state <= do_alu_write;
 								cpu_state_next <= do_fetch;
 							when "1100" => -- SETO instruction
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(10*cycle_clks_g, 16));
 								wr_dat <= x"FFFF";
 								cpu_state <= do_alu_write;
 								cpu_state_next <= do_fetch;
 							when "0101" => -- INV instruction
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(10*cycle_clks_g, 16));
 								ea <= alu_result;	-- save address SA
 								cpu_state_next <= do_single_op_read;
 								cpu_state <= do_read;
 								arg1 <= x"FFFF";
 								ope <= alu_xor;
 							when "0100" => -- NEG instruction
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(12*cycle_clks_g, 16));
 								-- test_out <= x"EEFF";
 								ea <= alu_result;	-- save address SA
 								cpu_state_next <= do_single_op_read;
@@ -863,6 +906,11 @@ begin
 								arg1 <= x"0000";
 								ope <= alu_sub;
 							when "1101" => -- ABS instruction
+								if arg2(15) = '0' then
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(12*cycle_clks_g, 16));
+								else
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(14*cycle_clks_g, 16));
+								end if;
 								-- test_out <= x"AABB";
 								ea <= alu_result;	-- save address SA
 								cpu_state_next <= do_single_op_read;
@@ -870,30 +918,35 @@ begin
 								arg1 <= x"0000";
 								ope <= alu_abs;
 							when "1011" =>  -- SWPB instruction
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(10*cycle_clks_g, 16));
 								ea <= alu_result;	-- save address SA
 								cpu_state_next <= do_single_op_read;
 								cpu_state <= do_read;
 								arg1 <= x"0000";
 								ope <= alu_swpb2;
 							when "0110" => -- INC instruction
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(10*cycle_clks_g, 16));
 								ea <= alu_result;	-- save address SA
 								cpu_state_next <= do_single_op_read;
 								cpu_state <= do_read;
 								arg1 <= x"0001";
 								ope <= alu_add;
 							when "0111" => -- INCT instruction
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(10*cycle_clks_g, 16));
 								ea <= alu_result;	-- save address SA
 								cpu_state_next <= do_single_op_read;
 								cpu_state <= do_read;
 								arg1 <= x"0002";
 								ope <= alu_add;
 							when "1000" => -- DEC instruction
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(10*cycle_clks_g, 16));
 								ea <= alu_result;	-- save address SA
 								cpu_state_next <= do_single_op_read;
 								cpu_state <= do_read;
 								arg1 <= x"FFFF";	-- add -1 to create DEC
 								ope <= alu_add;
 							when "1001" => -- DECT instruction
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(10*cycle_clks_g, 16));
 								ea <= alu_result;	-- save address SA
 								cpu_state_next <= do_single_op_read;
 								cpu_state <= do_read;
@@ -904,6 +957,7 @@ begin
 								cpu_state_next <= do_single_op_read;
 								cpu_state <= do_read;
 							when "0000" => -- BLWP instruction
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(26*cycle_clks_g, 16));
 								-- alu_result points to new WP
 								cpu_state <= do_blwp00;
 							when others =>
@@ -1046,6 +1100,7 @@ begin
 					when do_shifts0 =>
 						ea <= alu_result;	-- address of our working register
 						if shift_count = "00000" then 
+							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(8*cycle_clks_g, 16));
 							-- we need to read WR0 to get shift count
 							arg1 <= w;
 							arg2 <= x"0000";
@@ -1067,6 +1122,8 @@ begin
 						cpu_state <= do_read;
 						cpu_state_next <= do_shifts2;
 					when do_shifts2 => 
+				-- FIXME!!!
+				--		delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(2*shift_count*cycle_clks_g, 16));
 						-- shift count is now ready. rd_dat is our operand.
 						arg2 <= rd_dat;
 						case ir(9 downto 8) is 
@@ -1191,20 +1248,25 @@ begin
 						cpu_state <= do_stuck;
 						case ir(12 downto 10) is 
 							when "000" => -- COC
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(14*cycle_clks_g, 16));
 								ope <= alu_coc;
 								cpu_state <= do_coc_czc_etc3;
 							when "001" => -- CZC
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(14*cycle_clks_g, 16));
 								ope <= alu_czc;
 								cpu_state <= do_coc_czc_etc3;
 							when "010" => -- XOR
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(14*cycle_clks_g, 16));
 								ope <= alu_xor;
 								cpu_state <= do_coc_czc_etc3;
 							when "110" => -- MPY		
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(52*cycle_clks_g, 16));
 								mult_a <= "00" & reg_t;
 								mult_b <= "00" & rd_dat;
 								cpu_state <= do_mul_store0;
 								delay_count <= "00000100";
 							when "111" => -- DIV
+								--delay_ir_wait done elsewhere
 								-- we need here dest - source operation
 								arg1 <= rd_dat;
 								arg2 <= reg_t;
@@ -1250,6 +1312,7 @@ begin
 						-- First check for overflow condition (ST4) i.e. st(11)
 						st(11) <= '0'; -- by default no overflow
 						if (reg_t(15)='0' and rd_dat(15)='1') or (reg_t(15)=rd_dat(15) and alu_result(15)='0') then
+							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(16*cycle_clks_g, 16));
 							st(11) <= '1';	 -- overflow
 							cpu_state <= do_fetch;	-- done
 						else
@@ -1266,6 +1329,8 @@ begin
 						shift_count <= "10000"; -- 16
 						cpu_state <= do_div2;
 					when do_div2 =>
+						--delay_ir_wait is not accurate could be between 92 and 124
+						delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(92*cycle_clks_g, 16));
 						dividend(31 downto 0) <= dividend(30 downto 0) & '0'; -- shift left
 						arg1 <= dividend(30 downto 15);	-- shifted data to ALU too
 						arg2 <= reg_t;
@@ -1339,8 +1404,25 @@ begin
 						-- rd_dat is now R12
 						ea <= rd_dat;
 						if ir(9 downto 6) = "0000" then
+							if ir(10) = '0' then
+							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(52*cycle_clks_g, 16));
+							else
+							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(60*cycle_clks_g, 16));
+							end if;
 							shift_count <= '1' & ir(9 downto 6);
 						else
+							if ir(10) = '0' then
+					--FIXME!!!
+					--		delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned((20 + ir(9 downto 6))*cycle_clks_g, 16));
+							else
+								if ir(9 downto 6) = "1000" then
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(44*cycle_clks_g, 16));
+								elsif ir(9) = '1' then
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(58*cycle_clks_g, 16));
+								else
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(42*cycle_clks_g, 16));
+								end if;
+							end if;
 							shift_count <= '0' & ir(9 downto 6);
 						end if;
 						cpu_state <= do_ldcr2;
@@ -1656,6 +1738,10 @@ begin
 				
 				if delay_count /= "00000000" then
 					delay_count <= std_logic_vector(unsigned(delay_count) - to_unsigned(1, 8));
+				end if;
+				
+				if inc_ir_count then
+					delay_ir_count <= std_logic_vector(unsigned(delay_ir_count) + to_unsigned(1, 16));
 				end if;
 				
 			
