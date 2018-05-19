@@ -80,17 +80,17 @@ architecture tms9919_Behavioral of tms9919 is
 		return std_logic_vector is 
 	begin
 		case to_bitvector(att) is
-			when x"0" => return "00111100";		-- this is not good for now
-			when x"1" => return "00110000";	
-			when x"2" => return "00100010";
-			when x"3" => return "00010011";
-			when x"4" => return "00001111";
-			when x"5" => return "00001111";
-			when x"6" => return "00001111";
-			when x"7" => return "00001111";
-			when x"8" => return "00001100";
-			when x"9" => return "00001000";
-			when x"A" => return "00000110";
+			when x"0" => return "00011111";		-- must be less than 32 for add x4 +0x80 to fit in 8bits
+			when x"1" => return "00011001";	
+			when x"2" => return "00010100";
+			when x"3" => return "00010000";
+			when x"4" => return "00001100";
+			when x"5" => return "00001010";
+			when x"6" => return "00001001";
+			when x"7" => return "00001000";
+			when x"8" => return "00000111";
+			when x"9" => return "00000110";
+			when x"A" => return "00000101";
 			when x"B" => return "00000100";
 			when x"C" => return "00000011";
 			when x"D" => return "00000010";
