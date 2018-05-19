@@ -20,11 +20,11 @@ module multiplier (
 
   always @(posedge clk) begin
     if ((old_a != a) || (old_b != b)) begin
-	  bindex <= 1;
-	  product <= 36'h000000000;
+	  bindex <= 1 << 1;
+	  product <= {18'h00000, (18'h00001 & b) ? a : 18'h00000};
 	  old_a <= a;
 	  old_b <= b;
-	  shift_a <= a;
+	  shift_a <= a << 1;
     end else if (bindex < 19'h40000) begin
 	  product <= product + ((bindex & old_b) ? shift_a : 0);
 	  bindex <= bindex << 1;

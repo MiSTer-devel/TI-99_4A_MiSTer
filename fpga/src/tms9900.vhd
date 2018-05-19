@@ -65,7 +65,8 @@ entity tms9900 is
 	holda    : out STD_LOGIC;     -- DMA ack, active high
 	waits    : in STD_LOGIC_VECTOR(7 downto 0);	-- number of wait states per memory cycles
 	scratch_en : in STD_LOGIC;		-- when 1 in-core scratchpad RAM is enabled
-	stuck	 	: out  STD_LOGIC		-- when high the CPU is stuck
+	stuck	 	: out  STD_LOGIC;		-- when high the CPU is stuck
+	turbo    : in STD_LOGIC
 	);
 end tms9900;
 
@@ -437,6 +438,10 @@ begin
 						end if;
 					when do_read2 => cpu_state <= do_read3;
 					when do_read3 => 
+						if (addr(15 downto 10) /= "100000") and -- "100000" = 8000-83FF
+							 (addr(15 downto 13) /= "000") then  -- "000"    = 0000-1FFF 
+							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(4*cycle_clks_g, 16));
+						end if;
 						-- if ready='1' then 
 							cpu_state <= cpu_state_next;
 							rd <= '0';
@@ -494,6 +499,10 @@ begin
 						end if;
 					when do_write2 => cpu_state <= do_write3;
 					when do_write3 => 
+						if (addr(15 downto 10) /= "100000") and -- "100000" = 8000-83FF
+							 (addr(15 downto 13) /= "000") then  -- "000"    = 0000-1FFF 
+							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(4*cycle_clks_g, 16));
+						end if;
 						scratchpad_wr <= '0';
 						scratchpad_en <= '0';
 						-- if ready='1' then
@@ -506,7 +515,7 @@ begin
 					when do_fetch =>		-- instruction opcode fetch
 						if hold='1' then
 							holda <= '1';	-- honor DMA requests here - stay in do_fetch state
-						elsif delay_ir_wait <= delay_ir_count then -- wait for cycle counter
+						elsif (delay_ir_wait <= delay_ir_count) or (turbo = '1') then -- wait for cycle counter
 							inc_ir_count := False;
 							delay_ir_count <= x"0000";
 							delay_ir_wait <= x"0000";
@@ -514,6 +523,7 @@ begin
 							i_am_xop <= False;
 							-- check interrupt requests
 							if int_req = '1' and unsigned(ic03) <= unsigned(st(3 downto 0)) then
+								delay_ir_wait <= std_logic_vector(to_unsigned(26*cycle_clks_g, 16));
 								-- pass pointer to WP via ALU as our EA
 								set_int_priority <= True;
 								arg2 <= x"00" & "00" & ic03 & "00";	-- vector through interrupt priority
@@ -953,6 +963,7 @@ begin
 								arg1 <= x"FFFE";	-- add -2 to create DEC
 								ope <= alu_add;
 							when "0010" => -- X instruction...
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned((8-4)*cycle_clks_g, 16));
 								ea <= alu_result;
 								cpu_state_next <= do_single_op_read;
 								cpu_state <= do_read;
@@ -1122,8 +1133,6 @@ begin
 						cpu_state <= do_read;
 						cpu_state_next <= do_shifts2;
 					when do_shifts2 => 
-				-- FIXME!!!
-				--		delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(2*shift_count*cycle_clks_g, 16));
 						-- shift count is now ready. rd_dat is our operand.
 						arg2 <= rd_dat;
 						case ir(9 downto 8) is 
@@ -1139,6 +1148,7 @@ begin
 						end case;
 						cpu_state <= do_shifts3;
 					when do_shifts3 => 	-- we stay here doing the shifting
+						delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(2*cycle_clks_g, 16));
 						arg2 <= alu_result;
 						st(15) <= alu_logical_gt;
 						st(14) <= alu_arithmetic_gt;
@@ -1405,15 +1415,14 @@ begin
 						ea <= rd_dat;
 						if ir(9 downto 6) = "0000" then
 							if ir(10) = '0' then
-							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(52*cycle_clks_g, 16));
+							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(20*cycle_clks_g, 16));
 							else
 							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(60*cycle_clks_g, 16));
 							end if;
 							shift_count <= '1' & ir(9 downto 6);
 						else
 							if ir(10) = '0' then
-					--FIXME!!!
-					--		delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned((20 + ir(9 downto 6))*cycle_clks_g, 16));
+							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(20*cycle_clks_g, 16));
 							else
 								if ir(9 downto 6) = "1000" then
 								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(44*cycle_clks_g, 16));
@@ -1429,6 +1438,7 @@ begin
 					when do_ldcr2 =>
 						arg2 <= reg_t;
 						if ir(10) = '0' then
+							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(2*cycle_clks_g, 16));
 							ope <= alu_srl;	-- for LDCR,shift right	
 							cpu_state <= do_ldcr3;							
 						else	
@@ -1515,9 +1525,11 @@ begin
 							when "00" => -- workspace register
 								cpu_state <= cpu_state_operand_return;	-- return the workspace register address
 							when "01" => -- workspace register indirect
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(4*cycle_clks_g, 16));
 								cpu_state <= do_alu_read;
 								cpu_state_next <= do_source_address1;
 							when "10" => -- symbolic or indexed mode
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(8*cycle_clks_g, 16));
 								cpu_state <= do_pc_read;
 								if operand_mode(3 downto 0) = "0000" then
 									cpu_state_next <= do_source_address1;	-- symbolic
@@ -1551,8 +1563,10 @@ begin
 						reg_t <= rd_dat;	-- save the value of Rx, this is our return value
 						arg1 <= rd_dat;
 						if operand_word then
+							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(8*cycle_clks_g, 16));
 							arg2 <= x"0002";	
 						else
+							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(6*cycle_clks_g, 16));
 							arg2 <= x"0001";	
 						end if;
 						ope <= alu_add;

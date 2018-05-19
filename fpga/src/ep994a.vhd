@@ -118,7 +118,8 @@ entity ep994a is
 			  -- SWI 0: when set, CPU will automatically be taken out of reset after copying FLASH to RAM.
 			  
 	rom_mask_i       : in std_logic;
-	flashloading_i   : in std_logic
+	flashloading_i   : in std_logic;
+	turbo_i          : in std_logic
 );
 
 end ep994a;
@@ -362,7 +363,8 @@ architecture Behavioral of ep994a is
 			holda    : out STD_LOGIC;
 			waits    : in STD_LOGIC_VECTOR(7 downto 0);
 			scratch_en : in STD_LOGIC;		-- when 1 in-core scratchpad RAM is enabled
-         stuck : OUT  std_logic
+         stuck : OUT  std_logic;
+         turbo    : in STD_LOGIC
         );
     END COMPONENT;
 -------------------------------------------------------------------------------	
@@ -1119,7 +1121,8 @@ begin
 			 holda => cpu_holda,
 			 waits => waits,
 			 scratch_en => '0',
-          stuck => cpu_stuck
+          stuck => cpu_stuck,
+			 turbo => turbo_i
         );
 		
 end Behavioral;

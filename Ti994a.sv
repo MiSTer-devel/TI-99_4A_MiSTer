@@ -116,16 +116,17 @@ parameter CONF_STR = {
 	"F,BIN,Load G.bin;",
 	"O1,Aspect ratio,4:3,16:9;",
 	"O78,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
-	"-;",
+	"O9,Turbo,Off,On;",
 	"T6,Reset;",
 	"-;",
 	"-;",
 	"-;",
-	"J,Fire 1,Fire 2,*,#,0,1,2,3,Purple Tr,Blue Tr;",
+	"J,Fire 1,Fire 2;",
 	"V,v1.00.",`BUILD_DATE
 };
 
 wire reset_osd = status[6];
+wire turbo     = status[9];
 
 /////////////////  CLOCKS  ////////////////////////
 
@@ -385,7 +386,8 @@ ep994a console
 	.audio_o(audio),
 	
 	.rom_mask_i(rom_mask),
-	.flashloading_i(download_reset)
+	.flashloading_i(download_reset),
+	.turbo_i(turbo)
 );
 
 video_mixer #(.LINE_LENGTH(290)) video_mixer
