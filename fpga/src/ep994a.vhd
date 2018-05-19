@@ -108,7 +108,7 @@ entity ep994a is
     vblank_o        : out std_logic;
     comp_sync_n_o   : out std_logic;
     -- Audio Interface --------------------------------------------------------
-    audio_o         : out unsigned(7 downto 0);
+    audio_o         : out signed(7 downto 0);
 			  -- DEBUG (PS2 KBD port)
 			  --DEBUG1		: out std_logic;
 			  --DEBUG2		: out std_logic;
@@ -855,9 +855,9 @@ begin
 					vdp_rd <= '0';
 				end if;
 				grom_we <= '0';
-				--if (psg_ready_s = '1') then
+				if (psg_ready_s = '1') then
 					tms9919_we <= '0';
-				--end if;				
+				end if;				
 				paging_wr_enable <= '0';
 				if sams_regs(6)='0' then	-- if sams_regs(6) is set I/O is out and paged RAM is there instead
 					if go_write = '1' and MEM_n='0' then
@@ -1027,38 +1027,38 @@ begin
 		);
 
 	-- sound chip implementation
-	TMS9919_CHIP: entity work.tms9919
-		generic map (
-			divider_g => 191
-		)
-		port map (
-			clk 		=> clk,
-			reset		=> real_reset_n,
-			data_in 	=> data_from_cpu(15 downto 8),
-			we			=> tms9919_we,
-			dac_out	=> dac_data
-		);		
-		dac_convert: process(dac_data)
-		begin
-			audio_o <= unsigned(dac_data);
-		end process dac_convert;
+--	TMS9919_CHIP: entity work.tms9919
+--		generic map (
+--			divider_g => 191
+--		)
+--		port map (
+--			clk 		=> clk,
+--			reset		=> real_reset_n,
+--			data_in 	=> data_from_cpu(15 downto 8),
+--			we			=> tms9919_we,
+--			dac_out	=> dac_data
+--		);		
+--		dac_convert: process(dac_data)
+--		begin
+--			audio_o <= signed(dac_data);
+--		end process dac_convert;
   -----------------------------------------------------------------------------
   -- SN76489 Programmable Sound Generator
   -----------------------------------------------------------------------------
-  --psg_b : sn76489_top
-  --  generic map (
-  --    clock_div_16_g => 1
-  --  )
-  --  port map (
-  --    clock_i    => clk_i,
-  --    clock_en_i => clk_en_3m58_s,
-  --    res_n_i    => real_reset,--
-  --    ce_n_i     => not tms9919_we,--
-  --    we_n_i     => not tms9919_we,--
-  --    ready_o    => psg_ready_s,--
-  --    d_i        => audio_data_out,--
-  --    aout_o     => audio_o
-  --  );
+  psg_b : sn76489_top
+    generic map (
+      clock_div_16_g => 1
+    )
+    port map (
+      clock_i    => clk_i,
+      clock_en_i => clk_en_3m58_s,
+      res_n_i    => real_reset,--
+      ce_n_i     => not tms9919_we,--
+      we_n_i     => not tms9919_we,--
+      ready_o    => psg_ready_s,--
+      d_i        => audio_data_out,--
+      aout_o     => audio_o
+    );
 
 	
 	-- memory paging unit implementation

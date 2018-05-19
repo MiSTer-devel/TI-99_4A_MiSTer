@@ -322,7 +322,7 @@ spram #(14) vram
 wire [7:0] audio;
 assign AUDIO_L = {audio,8'd0};
 assign AUDIO_R = {audio,8'd0};
-assign AUDIO_S = 0;//1;
+assign AUDIO_S = 1;
 assign AUDIO_MIX = 0;
 
 assign CLK_VIDEO = clk_sys;
