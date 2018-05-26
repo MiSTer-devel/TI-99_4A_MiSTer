@@ -356,6 +356,7 @@ set_global_assignment -name QIP_FILE sys/sys.qip
 set_global_assignment -name QSYS_FILE sys/vip.qsys
 set_global_assignment -name VHDL_FILE dpram16_8.vhd
 set_global_assignment -name VHDL_FILE spram.vhd
+set_global_assignment -name VERILOG_FILE "sprom.v"
 set_global_assignment -name SYSTEMVERILOG_FILE sdram.sv
 set_global_assignment -name VHDL_FILE "sn76489/sn76489_comp_pack-p.vhd"
 set_global_assignment -name VHDL_FILE sn76489/sn76489_clock_div.vhd
@@ -392,6 +393,9 @@ set_global_assignment -name VHDL_FILE "fpga/src/ep994a.vhd"
 set_global_assignment -name VHDL_FILE "fpga/src/gromext.vhd"
 set_global_assignment -name VHDL_FILE "fpga/src/pager612.vhd"
 set_global_assignment -name VHDL_FILE "fpga/src/scratchpad.vhd"
+set_global_assignment -name VHDL_FILE "fpga/src/tispeechsyn.vhd"
+set_global_assignment -name VHDL_FILE "fpga/src/tms5220.vhd"
+set_global_assignment -name VHDL_FILE "fpga/src/tms6100.vhd"
 set_global_assignment -name VHDL_FILE "fpga/src/tms9900.vhd"
 set_global_assignment -name VHDL_FILE "fpga/src/tms9919.vhd"
 set_global_assignment -name SYSTEMVERILOG_FILE Ti994a.sv

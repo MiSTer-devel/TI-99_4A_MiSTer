@@ -121,7 +121,7 @@ parameter CONF_STR = {
 	"-;",
 	"-;",
 	"-;",
-	"J,Fire 1,Fire 2;",
+	"J,Fire 1,Fire 2,1,2,3;",
 	"V,v1.00.",`BUILD_DATE
 };
 
@@ -260,6 +260,23 @@ wire  [7:0] bios_d;
 //	.q(bios_d)
 //);
 
+wire [14:0] speech_a;
+wire  [7:0] speech_d;
+//sprom #("SPCHROM.BIN", 15) rom
+//(
+//	.clock(clk_sys),
+//	.address(speech_a),
+//	.q(speech_d)
+//);
+spram #(15) speechrom
+(
+	.clock(clk_sys),
+	.address(speech_a),
+	.wren(0),
+	.data('b00000000),
+	.q(speech_d)
+);
+
 // 17x16 bit address = 256K
 wire  [16:0] ram_a;
 wire        ram_we_n, ram_ce_n;
@@ -319,9 +336,9 @@ spram #(14) vram
 
 ////////////////  Console  ////////////////////////
 
-wire [7:0] audio;
-assign AUDIO_L = {audio,8'd0};
-assign AUDIO_R = {audio,8'd0};
+wire [15:0] audio;
+assign AUDIO_L = {audio};
+assign AUDIO_R = {audio};
 assign AUDIO_S = 1;
 assign AUDIO_MIX = 0;
 
@@ -383,7 +400,11 @@ ep994a console
 	.hblank_o(hblank),
 	.vblank_o(vblank),
 
-	.audio_o(audio),
+	.audio_total_o(audio),
+	
+	.sr_re_o(),
+	.sr_addr_o(speech_a),
+	.sr_data_i(speech_d),
 	
 	.rom_mask_i(rom_mask),
 	.flashloading_i(download_reset),
@@ -568,12 +589,17 @@ wire m_fire   = btn_fire  | joya[4];
 //wire m_p      = btn_p     | joya[7];
 //wire m_pt     = btn_pt    | joya[12];
 //wire m_bt     = btn_bt    | joya[13];
+//Parsec uses keys 1,2,3: Make these joystick buttons for convenience
+//Also can be used to select menu on boot
+wire m_1 = btn_1 | joya[5] | joya[5];
+wire m_2 = btn_2 | joya[6] | joyb[6];
+wire m_3 = btn_3 | joya[7] | joyb[7];
 
 wire [7:0] keys0 = {btn_eq, btn_pe, btn_co, btn_m,  btn_n,  btn_fs, m_fire,  m_fire2};        // last=fire2
 wire [7:0] keys1 = {btn_sp, btn_l,  btn_k,  btn_j,  btn_h,  btn_se, m_left,  m_left2};        // last=left2
 wire [7:0] keys2 = {btn_en, btn_o,  btn_i,  btn_u,  btn_y,  btn_p,  m_right, m_right2};       // last=right2
 wire [7:0] keys3 = {1'b0,   btn_9,  btn_8,  btn_7,  btn_6,  btn_0,  m_down,  m_down2};        // last=down2
-wire [7:0] keys4 = {btn_fn, btn_2,  btn_3,  btn_4,  btn_5,  btn_1,  m_up,    m_up2};          // last=up2/al
+wire [7:0] keys4 = {btn_fn, m_2,    m_3,    btn_4,  btn_5,  m_1,    m_up,    m_up2};          // last=up2/al
 wire [7:0] keys5 = {btn_sh, btn_s,  btn_d,  btn_f,  btn_g,  btn_a,  1'b0,      1'b0};         // last=
 wire [7:0] keys6 = {btn_ct, btn_w,  btn_e,  btn_r,  btn_t,  btn_q,  1'b0,      1'b0};         // last=
 wire [7:0] keys7 = {1'b0,   btn_x,  btn_c,  btn_v,  btn_b,  btn_z,  1'b0,      1'b0};         // last=

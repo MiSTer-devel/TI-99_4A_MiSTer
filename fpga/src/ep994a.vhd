@@ -108,7 +108,7 @@ entity ep994a is
     vblank_o        : out std_logic;
     comp_sync_n_o   : out std_logic;
     -- Audio Interface --------------------------------------------------------
-    audio_o         : out signed(7 downto 0);
+    audio_total_o   : out signed(15 downto 0);
 			  -- DEBUG (PS2 KBD port)
 			  --DEBUG1		: out std_logic;
 			  --DEBUG2		: out std_logic;
@@ -116,6 +116,10 @@ entity ep994a is
 			  -- SWITCHES (in reverse order compared to the markings)
 			  --SWI       : in std_logic_vector(7 downto 0);
 			  -- SWI 0: when set, CPU will automatically be taken out of reset after copying FLASH to RAM.
+
+	sr_re_o          : out std_logic;
+	sr_addr_o        : out std_logic_vector(14 downto 0);
+	sr_data_i        : in  std_logic_vector( 7 downto 0);
 			  
 	rom_mask_i       : in std_logic;
 	flashloading_i   : in std_logic;
@@ -135,7 +139,7 @@ use work.cv_comp_pack.cv_addr_dec;
 use work.cv_comp_pack.cv_bus_mux;
 use work.vdp18_core_comp_pack.vdp18_core;
 use work.sn76489_comp_pack.sn76489_top;
-
+use work.tispeechsyn;
 
 architecture Behavioral of ep994a is
 
@@ -232,9 +236,14 @@ architecture Behavioral of ep994a is
   signal psg_ready_s      : std_logic;
 	signal tms9919_we		: std_logic;		-- write enable pulse for the audio "chip"
 	signal audio_data_out: std_logic_vector(7 downto 0);
+   signal audio_o       : signed(7 downto 0);
 	
 	-- disk subsystem
 	signal cru1100			: std_logic;		-- disk controller CRU select
+
+	-- Speech signals
+	signal speech_data_out	: std_logic_vector(7 downto 0);
+   signal speech_o       : signed(7 downto 0);
 	
 	-- SAMS memory extension
 	signal sams_regs			: std_logic_vector(7 downto 0) := x"00";
@@ -967,6 +976,7 @@ begin
 	vdp_data_out(7 downto 0) <= x"00";
 	data_to_cpu <= 
 		vdp_data_out         			when sams_regs(6)='0' and cpu_addr(15 downto 10) = "100010" else	-- 10001000..10001011 (8800..8BFF)
+		speech_data_out & x"00"       when sams_regs(6)='0' and cpu_addr(15 downto 10) = "100100" else	-- speech address read (9000..93FF)
 		grom_data_out & x"00" 			when sams_regs(6)='0' and cpu_addr(15 downto 8) = x"98" and cpu_addr(1)='1' else	-- GROM address read
 		pager_data_out(7 downto 0) & pager_data_out(7 downto 0) when paging_registers = '1' else	-- replicate pager values on both hi and lo bytes
 		sram_16bit_read_bus(15 downto 8) & x"00" when sams_regs(6)='0' and cpu_addr(15 downto 8) = x"98" and cpu_addr(1)='0' and grom_ram_addr(0)='0' and grom_selected='1' else
@@ -1124,6 +1134,24 @@ begin
           stuck => cpu_stuck,
 			 turbo => turbo_i
         );
-		
+
+	speech : tispeechsyn
+	PORT MAP (
+          clk_i => clk,
+          reset_n_i => not cpu_reset,
+          addr_i => cpu_addr,
+          data_o => speech_data_out,
+          data_i => data_from_cpu(15 downto 8),
+			 dbin_i => cpu_rd,
+			 ready_o => open, --could use this
+			 aout_o => speech_o,
+			 sr_re_o => sr_re_o,
+			 sr_addr_o => sr_addr_o,
+			 sr_data_i => sr_data_i
+        );
+		  
+	audio_total_o <= shift_left(resize(audio_o, audio_total_o'length)
+										+resize(speech_o,audio_total_o'length), natural(7));
+		  
 end Behavioral;
 
