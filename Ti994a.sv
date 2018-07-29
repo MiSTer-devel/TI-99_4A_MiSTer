@@ -250,32 +250,21 @@ sdram sdram
 	.doutB       	( memory_doutB	)
 );
 
-wire [12:0] bios_a;
-wire  [7:0] bios_d;
-
-//sprom #("bios.hex", 13) rom
-//(
-//	.clock(clk_sys),
-//	.address(bios_a),
-//	.q(bios_d)
-//);
-
 wire [14:0] speech_a;
 wire  [7:0] speech_d;
-//sprom #("SPCHROM.BIN", 15) rom
-//(
-//	.clock(clk_sys),
-//	.address(speech_a),
-//	.q(speech_d)
-//);
+wire [14:0] speechrom_a;
+
+assign speechrom_a = ioctl_download ? ioctl_addr[14:0] : speech_a;
+
 spram #(15) speechrom
 (
 	.clock(clk_sys),
-	.address(speech_a),
-	.wren(0),
-	.data('b00000000),
+	.wren(ioctl_wr && |ioctl_addr[24:18]),
+	.data(ioctl_dout),
+	.address(speechrom_a),
 	.q(speech_d)
 );
+
 
 // 17x16 bit address = 256K
 wire  [16:0] ram_a;
@@ -319,21 +308,6 @@ spram #(14) vram
 	.q(vram_di)
 );
 
-//wire [14:0] cart_a;
-//wire  [7:0] cart_d;
-
-//dpram #(15) cart
-//(
-//	.clk_a_i(clk_sys),
-//	.we_i(ioctl_wr && !ioctl_addr[24:15]),
-//	.addr_a_i(ioctl_addr[14:0]),
-//	.data_a_i(ioctl_dout),
-//
-//	.clk_b_i(clk_sys),
-//	.addr_b_i(cart_a),
-//	.data_b_o(cart_d)
-//);
-
 ////////////////  Console  ////////////////////////
 
 wire [15:0] audio;
@@ -343,16 +317,6 @@ assign AUDIO_S = 1;
 assign AUDIO_MIX = 0;
 
 assign CLK_VIDEO = clk_sys;
-
-//wire [1:0] ctrl_p1;
-//wire [1:0] ctrl_p2;
-//wire [1:0] ctrl_p3;
-//wire [1:0] ctrl_p4;
-//wire [1:0] ctrl_p5;
-//wire [1:0] ctrl_p6;
-//wire [1:0] ctrl_p7 = 2'b11;
-//wire [1:0] ctrl_p8;
-//wire [1:0] ctrl_p9 = 2'b11;
 
 wire [7:0] R,G,B;
 wire hblank, vblank;
@@ -374,9 +338,6 @@ ep994a console
 	// GPIO 0..7  = IO1P..IO8P - these are the keyboard row strobes.
 	// GPIO 8..15 = IO1N..IO8N - these are key input signals.
 
-	//.bios_rom_a_o(bios_a),
-	//.bios_rom_d_i(bios_d),
-
 	.cpu_ram_a_o(ram_a),
 	.cpu_ram_we_n_o(ram_we_n),
 	.cpu_ram_ce_n_o(ram_ce_n),
@@ -388,9 +349,6 @@ ep994a console
 	.vram_we_o(vram_we),
 	.vram_d_o(vram_do),
 	.vram_d_i(vram_di),
-
-	//.cart_a_o(cart_a),
-	//.cart_d_i(cart_d),
 
 	.rgb_r_o(R),
 	.rgb_g_o(G),

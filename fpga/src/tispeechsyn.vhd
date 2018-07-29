@@ -34,6 +34,7 @@ entity tispeechsyn is
 		addr_i    : in STD_LOGIC_VECTOR (15 downto 0);
 		data_i    : in STD_LOGIC_VECTOR (7 downto 0);
 		data_o    : out STD_LOGIC_VECTOR (7 downto 0);
+		mem_n_i   : in STD_LOGIC;
 		dbin_i    : in STD_LOGIC;
 		ready_o   : out STD_LOGIC;
 		--int_n_o   : out STD_LOGIC_VECTOR; --nc
@@ -67,7 +68,7 @@ begin
     port map (
 		reset     => not reset_n_i,
 		clk_i     => clk_i,
-		ce_n_i    => not clk_i,
+		ce_n_i    => '0',--not clk_i,
 		rs_n_i    => rs_n_o,
 		ws_n_i    => ws_n_o,
 		add1_o    => add1,
@@ -85,13 +86,13 @@ begin
     );
 
   -----------------------------------------------------------------------------
-  -- tms5220
+  -- tms6100
   -----------------------------------------------------------------------------
   tms6100_b : tms6100
     port map (
 		reset     => not reset_n_i,
 		clk_i     => clk_i,
-		ce_n_i    => not clk_i,
+		ce_n_i    => '0',--not clk_i,
 		add1_i    => add1,
 		add2_i    => add2,
 		add4_i    => add4,
@@ -113,9 +114,9 @@ begin
 			--reset_n_i already 1;
 			rs_n_o <= '1';
 			ws_n_o <= '1';
-			if    (addr_i(15 downto 10)=b"100100" and addr_i(0)='0' and dbin_i='1') then
+			if    (addr_i(15 downto 10)=b"100100" and addr_i(0)='0' and mem_n_i='0' and dbin_i='1') then
 				rs_n_o <= '0';
-			elsif (addr_i(15 downto 10)=b"100101" and addr_i(0)='0' and dbin_i='0') then
+			elsif (addr_i(15 downto 10)=b"100101" and addr_i(0)='0' and mem_n_i='0' and dbin_i='0') then
 				ws_n_o <= '0';
 			end if;
 		end if;

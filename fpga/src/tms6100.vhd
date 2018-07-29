@@ -48,9 +48,10 @@ architecture tms6100_Behavioral of tms6100 is
 	signal addr      : std_logic_vector(19 downto 0);
 	signal databit   : std_logic_vector(7 downto 0);
 	signal branch_hi : std_logic_vector(5 downto 0);
-	signal loading   : integer;
+	signal loading   : std_logic_vector(3 downto 0);
 	signal branching : std_logic;
 	signal add_all   : std_logic_vector(3 downto 0);
+	signal last_m0   : std_logic;
 
 begin
 
@@ -63,11 +64,13 @@ begin
 		if reset = '1' then
 			addr <= (others => '0');
 			databit <= x"80";
-			loading <= 0;
+			loading <= x"0";
 			branching <= '0';
 			re_o <= '0';
+			last_m0 <= '0';
 		elsif rising_edge(clk_i) and (ce_n_i='0') then
 			re_o <= '0';
+			last_m0 <= m0_i;
 			if (branching='1') then
 				addr <= addr(19 downto 14) & branch_hi & data_i;
 				branching <= '0';
@@ -77,24 +80,29 @@ begin
 				branch_hi <= data_i(5 downto 0);
 			elsif m1_i='1' then
 			   case loading is
-					when 0 =>
+					when x"0" =>
 						addr <= addr(19 downto 4) & add_all;
-					when 1 =>
+						loading <= x"1";
+					when x"1" =>
 						addr <= addr(19 downto 8) & add_all & addr(3 downto 0);
-					when 2 =>
+						loading <= x"2";
+					when x"2" =>
 						addr <= addr(19 downto 12) & add_all & addr(7 downto 0);
-					when 3 =>
+						loading <= x"3";
+					when x"3" =>
 						addr <= addr(19 downto 16) & add_all & addr(11 downto 0);
-					when 4 =>
+						loading <= x"4";
+					when x"4" =>
 						addr <= "00" & add_all(1 downto 0) & addr(15 downto 0);
+						loading <= x"5";
 					when others =>
 						addr <= addr;
 				end case;
-				loading <= loading + 1;
-			elsif (m0_i='1' and loading>0) then
+			elsif (last_m0='0' and m0_i='1' and loading/=x"0") then
 				re_o <= '1';
-				loading <= 0;
-			elsif (m0_i='1' and addr<x"08000") then --2x chips
+				loading <= x"0";
+				databit <= x"80";
+			elsif (last_m0='0' and m0_i='1' and addr<x"08000") then --2x chips
 				add8_o <= or_reduce(databit and data_i);
 				if (databit(0) = '1') then
 					addr <= std_logic_vector(unsigned(addr) + to_unsigned(1, addr'length));

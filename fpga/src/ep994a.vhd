@@ -1142,6 +1142,7 @@ begin
           addr_i => cpu_addr,
           data_o => speech_data_out,
           data_i => data_from_cpu(15 downto 8),
+			 MEM_n_i => MEM_n,
 			 dbin_i => cpu_rd,
 			 ready_o => open, --could use this
 			 aout_o => speech_o,

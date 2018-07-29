@@ -61,7 +61,7 @@ architecture tms5220_Behavioral of tms5220 is
 	signal fifo      : fifo_array;
 	signal in_fifo   : std_logic_vector(3 downto 0);
 	signal out_fifo  : std_logic_vector(6 downto 0);
-	signal fifo_len  : unsigned(3 downto 0);
+	signal fifo_len  : unsigned(4 downto 0);
 
 	signal loading   : integer;
 	signal external  : std_logic;
@@ -74,7 +74,9 @@ architecture tms5220_Behavioral of tms5220 is
 	signal readbyte  : std_logic;
 	signal m0        : std_logic;
 	signal m1        : std_logic;
-	
+	signal dummy     : std_logic_vector(1 downto 0);
+	signal loadcnt   : std_logic_vector(4 downto 0);
+
 begin
 	--only used when m1_o is high
 	add1_o <= data_i(0);
@@ -84,11 +86,13 @@ begin
 	m0_o <= m0;
 	m1_o <= m1;
 	status(2) <= speaking;
-	status(1) <= '0';-- fifo_len <= unsigned(8);
-	status(0) <= '1' when in_fifo=out_fifo(6 downto 3) else '0';
+	status(1) <= '1' when fifo_len <= to_unsigned(8, fifo_len'length) else '0';
+	status(0) <= '1' when fifo_len = to_unsigned(0, fifo_len'length) else '0';
 	data_o <= rdata when readbyte='1' else (status & b"00000");
 
 	process(clk_i, reset)
+		variable inc1 : boolean;
+		variable dec1 : boolean;
 	begin
 		if reset = '1' then
 			aout_o <= to_signed(0, 8);
@@ -103,35 +107,47 @@ begin
 			loadbit <= x"80";
 			in_fifo <= x"0";
 			out_fifo <= b"0000000";
-			--fifo_len <= 0;
+			fifo_len <= to_unsigned(0, 5);
+			dummy <= b"00";
+			loadcnt <= b"00000";
 		elsif rising_edge(clk_i) then
+			dec1 := False;
+			inc1 := False;
 			last_ws_n <= ws_n_i;
 			last_rs_n <= rs_n_i;
 			m0 <= '0';
 			m1 <= '0';
-			if ((readbyte='1') and or_reduce(loadbit)='1') then
-				if (m0='1') then
+			if (loadcnt(4)='1') then
+				--m0 <= '0';
+				dummy <= b"11";
+				loadcnt <= b"00000";
+			elsif (or_reduce(dummy)='1') then
+				m0 <= dummy(0);
+				dummy <= '0' & dummy(1);
+			elsif ((readbyte='1') and or_reduce(loadbit)='1') then
+				if (m0='0') then
 					rdata <= rdata(6 downto 0) & add8_i;
-					loadbit <= '0' & loadbit(6 downto 0);
-				else
-					m0 <= '1';
+					m0 <= not loadbit(0); -- 1 except last loadbit
+					loadbit <= '0' & loadbit(7 downto 1);
 				end if;
 			end if;
-			if ((rs_n_i = '0') and (last_rs_n = '1')) then
+			if ((rs_n_i = '1') and (last_rs_n = '0')) then --rising edge?
 				readbyte <= '0';
-			elsif ((ws_n_i = '0') and (last_ws_n = '1')) then
+			elsif ((ws_n_i = '1') and (last_ws_n = '0')) then --rising edge?
 				if (external='0') then
-					case data_i(6 downto 4) is
+				case data_i(6 downto 4) is
 						when cmd_reset =>
 							speaking <= '0';
 						when cmd_load =>
 							m1 <= '1';
+							loadcnt <= loadcnt(3 downto 0) & '1';
 						when cmd_speak =>
 							speaking <= '1';
 						when cmd_speakext =>
 							external <= '1';
 						when cmd_readbyte =>
 							loadbit <= x"80";
+							readbyte <= '1';
 							m0 <= '1';
 						when cmd_readbr =>
 							speaking <= '1';
@@ -141,12 +157,17 @@ begin
 				else
 					if (data_i=x"FF") then
 						external <= '0';
-					else
+					elsif (fifo_len < 16) then
 						fifo(to_integer(unsigned(in_fifo))) <= data_i;
 						in_fifo <= std_logic_vector(unsigned(in_fifo) + to_unsigned(1, in_fifo'length));
-						--fifo_len <= fifo_len + unsigned(1);
+						inc1 := True;
 					end if;
 				end if;
+			end if;
+			if inc1 and not dec1 then
+				fifo_len <= fifo_len + (1);
+			elsif not inc1 and dec1 then
+				fifo_len <= fifo_len - (1);
 			end if;
 		end if;
 	end process;
