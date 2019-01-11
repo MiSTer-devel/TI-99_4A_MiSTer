@@ -47,6 +47,8 @@ module emu
 	output        VGA_HS,
 	output        VGA_VS,
 	output        VGA_DE,    // = ~(VBlank | HBlank)
+	output        VGA_F1,
+	output [1:0]  VGA_SL,
 
 	output        LED_USER,  // 1 - ON, 0 - OFF.
 
@@ -93,20 +95,27 @@ module emu
 	output        SDRAM_nCS,
 	output        SDRAM_nCAS,
 	output        SDRAM_nRAS,
-	output        SDRAM_nWE
+	output        SDRAM_nWE,
+
+	input         UART_CTS,
+	output        UART_RTS,
+	input         UART_RXD,
+	output        UART_TXD,
+	output        UART_DTR,
+	input         UART_DSR
 );
+
+assign {UART_RTS, UART_TXD, UART_DTR} = 0;
 
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = 0;
  
-assign LED_USER  = ioctl_download;// | (loader_fail);// & led_blink);
+assign LED_USER  = ioctl_download;
 assign LED_DISK  = 0;
 assign LED_POWER = 0;
 
 assign VIDEO_ARX = status[1] ? 8'd16 : 8'd4;
 assign VIDEO_ARY = status[1] ? 8'd9  : 8'd3; 
-
-wire [1:0] scale = status[8:7];
 
 `include "build_id.v" 
 parameter CONF_STR = {
@@ -115,18 +124,18 @@ parameter CONF_STR = {
 	"F,BIN,Load D.bin;",
 	"F,BIN,Load G.bin;",
 	"O1,Aspect ratio,4:3,16:9;",
-	"O78,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
-	"O9,Turbo,Off,On;",
-	"T6,Reset;",
+	"O79,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
+	"OA,Turbo,Off,On;",
+	"R0,Reset;",
 	"-;",
 	"-;",
 	"-;",
 	"J,Fire 1,Fire 2,1,2,3;",
-	"V,v1.00.",`BUILD_DATE
+	"V,v",`BUILD_DATE
 };
 
-wire reset_osd = status[6];
-wire turbo     = status[9];
+wire reset_osd = status[0];
+wire turbo     = status[10];
 
 /////////////////  CLOCKS  ////////////////////////
 
@@ -156,7 +165,7 @@ end
 wire [31:0] status;
 wire  [1:0] buttons;
 
-wire [15:0] joya, joyb;
+wire [15:0] joy0, joy1;
 wire [10:0] ps2_key;
 
 wire        ioctl_download;
@@ -185,8 +194,8 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 
 	.ps2_key(ps2_key),
 
-	.joystick_0(joya),
-	.joystick_1(joyb)
+	.joystick_0(joy0),
+	.joystick_1(joy1)
 );
 
 /////////////////  RESET  /////////////////////////
@@ -206,49 +215,9 @@ always @(posedge CLK_50M) begin
 	else if(ioctl_download) init_reset <= 1'b0;
 end
 
-wire reset = (init_reset || buttons[1] || RESET || reset_osd);// || download_reset );
+wire reset = (init_reset || buttons[1] || RESET || reset_osd | ioctl_download);
 
 /////////////////  Memory  ////////////////////////
-wire [24:0] memory_addr;       // 25 bit byte address
-wire        memory_we;                // cpu/chipset requests write
-wire [7:0]  memory_din;               // data input from chipset/cpu
-wire        memory_oeA;               // cpu requests data
-wire [7:0]  memory_doutA;             // data output to cpu
-wire        memory_oeB;               // ppu requests data
-wire [7:0]  memory_doutB;             // data output to ppu
-
-assign memory_we = 1'b0;
-assign SDRAM_CKE         = 1'b1;
-
-sdram sdram
-(
-	// interface to the MT48LC16M16 chip
-	.sd_data     	( SDRAM_DQ                 ),
-	.sd_addr     	( SDRAM_A                  ),
-	.sd_dqm      	( {SDRAM_DQMH, SDRAM_DQML} ),
-	.sd_cs       	( SDRAM_nCS                ),
-	.sd_ba       	( SDRAM_BA                 ),
-	.sd_we       	( SDRAM_nWE                ),
-	.sd_ras      	( SDRAM_nRAS               ),
-	.sd_cas      	( SDRAM_nCAS               ),
-
-	// system interface
-	.clk      		( clk_sys         				),
-	.clkref      	( ce_5m3         			),
-	.init         	( !pll_locked     			),
-
-	// cpu/chipset interface
-	.addr     		( memory_addr ),
-	
-	.we       		( memory_we	),
-	.din       		( memory_din ),
-	
-	.oeA         	( memory_oeA ),
-	.doutA       	( memory_doutA	),
-	
-	.oeB         	( memory_oeB ),
-	.doutB       	( memory_doutB	)
-);
 
 wire [14:0] speech_a;
 wire  [7:0] speech_d;
@@ -291,7 +260,7 @@ dpram16_8 #(17) ram
 
 	.wren_b(ioctl_wr && !ioctl_addr[24:18]),
 	.address_b(download_addr),
-	.data_b(ioctl_dout),
+	.data_b(ioctl_dout)
 );
 
 wire [13:0] vram_a;
@@ -308,12 +277,32 @@ spram #(14) vram
 	.q(vram_di)
 );
 
+wire [19:0] cart_a;
+wire  [7:0] cart_d;
+wire        cart_rd;
+
+assign SDRAM_CLK = ~clk_sys;
+sdram sdram
+(
+	.*,
+	.init(~pll_locked),
+	.clk(clk_sys),
+
+   .wtbt(0),
+   .addr(ioctl_download ? ioctl_addr : cart_a),
+   .rd(cart_rd),
+   .dout(cart_d),
+   .din(ioctl_dout),
+   .we(ioctl_wr),
+   .ready()
+);
+
 ////////////////  Console  ////////////////////////
 
-wire [15:0] audio;
-assign AUDIO_L = {audio};
-assign AUDIO_R = {audio};
-assign AUDIO_S = 1;
+wire [10:0] audio;
+assign AUDIO_L = {audio,5'd0};
+assign AUDIO_R = {audio,5'd0};
+assign AUDIO_S = 0;
 assign AUDIO_MIX = 0;
 
 assign CLK_VIDEO = clk_sys;
@@ -369,6 +358,12 @@ ep994a console
 	.turbo_i(turbo)
 );
 
+assign VGA_F1 = 0;
+assign VGA_SL = sl[1:0];
+
+wire [2:0] scale = status[9:7];
+wire [2:0] sl = scale ? scale - 1'd1 : 3'd0;
+
 video_mixer #(.LINE_LENGTH(290)) video_mixer
 (
 	.*,
@@ -376,7 +371,7 @@ video_mixer #(.LINE_LENGTH(290)) video_mixer
 	.ce_pix(ce_5m3),
 	.ce_pix_out(CE_PIXEL),
 
-	.scanlines({scale == 3, scale == 2}),
+	.scanlines(0),
 	.scandoubler(scale || forced_scandoubler),
 	.hq2x(scale==1),
 
@@ -528,30 +523,30 @@ reg btn_left  = 0;
 reg btn_right = 0;
 reg btn_fire  = 0;
 
-wire m_right2  = joyb[0];
-wire m_left2   = joyb[1];
-wire m_down2   = joyb[2];
-wire m_up2     = joyb[3];
-wire m_fire2   = joyb[4];
-wire m_right  = btn_right | joya[0];
-wire m_left   = btn_left  | joya[1];
-wire m_down   = btn_down  | joya[2];
-wire m_up     = btn_up    | joya[3];
-wire m_fire   = btn_fire  | joya[4];
-//wire m_arm    = btn_arm   | joya[5];
-//wire m_1      = btn_1     | joya[9];
-//wire m_2      = btn_2     | joya[10];
-//wire m_3      = btn_3     | joya[11];
-//wire m_s      = btn_s     | joya[6];
-//wire m_0      = btn_0     | joya[8];
-//wire m_p      = btn_p     | joya[7];
-//wire m_pt     = btn_pt    | joya[12];
-//wire m_bt     = btn_bt    | joya[13];
+wire m_right2  = joy1[0];
+wire m_left2   = joy1[1];
+wire m_down2   = joy1[2];
+wire m_up2     = joy1[3];
+wire m_fire2   = joy1[4];
+wire m_right  = btn_right | joy0[0];
+wire m_left   = btn_left  | joy0[1];
+wire m_down   = btn_down  | joy0[2];
+wire m_up     = btn_up    | joy0[3];
+wire m_fire   = btn_fire  | joy0[4];
+//wire m_arm    = btn_arm   | joy0[5];
+//wire m_1      = btn_1     | joy0[9];
+//wire m_2      = btn_2     | joy0[10];
+//wire m_3      = btn_3     | joy0[11];
+//wire m_s      = btn_s     | joy0[6];
+//wire m_0      = btn_0     | joy0[8];
+//wire m_p      = btn_p     | joy0[7];
+//wire m_pt     = btn_pt    | joy0[12];
+//wire m_bt     = btn_bt    | joy0[13];
 //Parsec uses keys 1,2,3: Make these joystick buttons for convenience
 //Also can be used to select menu on boot
-wire m_1 = btn_1 | joya[5] | joya[5];
-wire m_2 = btn_2 | joya[6] | joyb[6];
-wire m_3 = btn_3 | joya[7] | joyb[7];
+wire m_1 = btn_1 | joy0[5] | joy1[5];
+wire m_2 = btn_2 | joy0[6] | joy1[6];
+wire m_3 = btn_3 | joy0[7] | joy1[7];
 
 wire [7:0] keys0 = {btn_eq, btn_pe, btn_co, btn_m,  btn_n,  btn_fs, m_fire,  m_fire2};        // last=fire2
 wire [7:0] keys1 = {btn_sp, btn_l,  btn_k,  btn_j,  btn_h,  btn_se, m_left,  m_left2};        // last=left2

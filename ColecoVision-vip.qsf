@@ -23,8 +23,6 @@
 #
 # -------------------------------------------------------------------------- #
 
-set_global_assignment -name VERILOG_MACRO "LITE=1"
-
 set_global_assignment -name FAMILY "Cyclone V"
 set_global_assignment -name DEVICE 5CSEBA6U23I7
 set_global_assignment -name TOP_LEVEL_ENTITY sys_top
@@ -50,8 +48,8 @@ set_global_assignment -name POWER_BOARD_THERMAL_MODEL "NONE (CONSERVATIVE)"
 set_global_assignment -name TIMEQUEST_MULTICORNER_ANALYSIS OFF
 set_global_assignment -name OPTIMIZE_POWER_DURING_FITTING OFF
 set_global_assignment -name FINAL_PLACEMENT_OPTIMIZATION ALWAYS
-set_global_assignment -name FITTER_EFFORT "FAST FIT"
-set_global_assignment -name OPTIMIZATION_MODE BALANCED
+set_global_assignment -name FITTER_EFFORT "STANDARD FIT"
+set_global_assignment -name OPTIMIZATION_MODE "HIGH PERFORMANCE EFFORT"
 set_global_assignment -name SEED 1
 
 #============================================================
@@ -355,11 +353,11 @@ set_global_assignment -name PRE_FLOW_SCRIPT_FILE "quartus_sh:sys/build_id.tcl"
 
 set_global_assignment -name CDF_FILE jtag.cdf
 set_global_assignment -name QIP_FILE sys/sys.qip
-set_global_assignment -name VHDL_FILE dpram16_8.vhd
-set_global_assignment -name VHDL_FILE spram.vhd
-set_global_assignment -name VERILOG_FILE "sprom.v"
+set_global_assignment -name QSYS_FILE sys/vip.qsys
+set_global_assignment -name QIP_FILE T80/t80.qip
 set_global_assignment -name SYSTEMVERILOG_FILE sdram.sv
-set_global_assignment -name VHDL_FILE "sn76489/sn76489_comp_pack-p.vhd"
+set_global_assignment -name VHDL_FILE bram.vhd
+set_global_assignment -name SYSTEMVERILOG_FILE YM2149.sv
 set_global_assignment -name VHDL_FILE sn76489/sn76489_clock_div.vhd
 set_global_assignment -name VHDL_FILE sn76489/sn76489_latch_ctrl.vhd
 set_global_assignment -name VHDL_FILE sn76489/sn76489_noise.vhd
@@ -376,28 +374,12 @@ set_global_assignment -name VHDL_FILE vdp18/vdp18_cpuio.vhd
 set_global_assignment -name VHDL_FILE vdp18/vdp18_ctrl.vhd
 set_global_assignment -name VHDL_FILE vdp18/vdp18_hor_vert.vhd
 set_global_assignment -name VHDL_FILE vdp18/vdp18_addr_mux.vhd
-set_global_assignment -name VHDL_FILE "vdp18/vdp18_comp_pack-p.vhd"
 set_global_assignment -name VHDL_FILE vdp18/vdp18_core.vhd
-set_global_assignment -name VHDL_FILE "vdp18/vdp18_core_comp_pack-p.vhd"
 set_global_assignment -name VHDL_FILE cv_addr_dec.vhd
 set_global_assignment -name VHDL_FILE cv_ctrl.vhd
 set_global_assignment -name VHDL_FILE cv_bus_mux.vhd
 set_global_assignment -name VHDL_FILE cv_clock.vhd
-set_global_assignment -name VHDL_FILE "cv_comp_pack-p.vhd"
 set_global_assignment -name VHDL_FILE cv_por.vhd
-set_global_assignment -name VHDL_FILE "tech_comp_pack-p.vhd"
 set_global_assignment -name VHDL_FILE cv_console.vhd
-set_global_assignment -name VHDL_FILE "cv_keys_pack-p.vhd"
-set_global_assignment -name VHDL_FILE "cv_console_comp_pack-p.vhd"
-set_global_assignment -name VERILOG_FILE "multiplier.v"
-set_global_assignment -name VHDL_FILE "fpga/src/ep994a.vhd"
-set_global_assignment -name VHDL_FILE "fpga/src/gromext.vhd"
-set_global_assignment -name VHDL_FILE "fpga/src/pager612.vhd"
-set_global_assignment -name VHDL_FILE "fpga/src/scratchpad.vhd"
-set_global_assignment -name VHDL_FILE "fpga/src/tispeechsyn.vhd"
-set_global_assignment -name VHDL_FILE "fpga/src/tms5220.vhd"
-set_global_assignment -name VHDL_FILE "fpga/src/tms6100.vhd"
-set_global_assignment -name VHDL_FILE "fpga/src/tms9900.vhd"
-set_global_assignment -name VHDL_FILE "fpga/src/tms9919.vhd"
-set_global_assignment -name SYSTEMVERILOG_FILE Ti994a.sv
+set_global_assignment -name SYSTEMVERILOG_FILE ColecoVision.sv
 set_instance_assignment -name PARTITION_HIERARCHY root_partition -to | -section_id Top

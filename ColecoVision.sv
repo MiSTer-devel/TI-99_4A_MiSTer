@@ -48,6 +48,8 @@ module emu
 	output        VGA_HS,
 	output        VGA_VS,
 	output        VGA_DE,    // = ~(VBlank | HBlank)
+	output        VGA_F1,
+	output [1:0]  VGA_SL,
 
 	output        LED_USER,  // 1 - ON, 0 - OFF.
 
@@ -94,11 +96,19 @@ module emu
 	output        SDRAM_nCS,
 	output        SDRAM_nCAS,
 	output        SDRAM_nRAS,
-	output        SDRAM_nWE
+	output        SDRAM_nWE,
+
+	input         UART_CTS,
+	output        UART_RTS,
+	input         UART_RXD,
+	output        UART_TXD,
+	output        UART_DTR,
+	input         UART_DSR
 );
 
+assign {UART_RTS, UART_TXD, UART_DTR} = 0;
+
 assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
-assign {SDRAM_DQ, SDRAM_A, SDRAM_BA, SDRAM_CLK, SDRAM_CKE, SDRAM_DQML, SDRAM_DQMH, SDRAM_nWE, SDRAM_nCAS, SDRAM_nRAS, SDRAM_nCS} = 'Z;
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = 0;
  
 assign LED_USER  = ioctl_download;
@@ -108,23 +118,22 @@ assign LED_POWER = 0;
 assign VIDEO_ARX = status[1] ? 8'd16 : 8'd4;
 assign VIDEO_ARY = status[1] ? 8'd9  : 8'd3; 
 
-wire [1:0] scale = status[8:7];
-
 `include "build_id.v" 
 parameter CONF_STR = {
 	"Coleco;;",
 	"-;",
-	"F,COLBIN;",
+	"F,COLBINROM;",
+	"F,SG,Load SG-1000;",
 	"-;",
 	"O1,Aspect ratio,4:3,16:9;",
-	"O78,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
+	"O79,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"-;",
-	"T6,Reset;",
+	"O3,Joysticks swap,No,Yes;",
 	"-;",
-	"-;",
-	"-;",
+	"O45,RAM Size,1KB,8KB,SGM;",
+	"R0,Reset;",
 	"J,Fire 1,Fire 2,*,#,0,1,2,3,Purple Tr,Blue Tr;",
-	"V,v1.00.",`BUILD_DATE
+	"V,v",`BUILD_DATE
 };
 
 /////////////////  CLOCKS  ////////////////////////
@@ -155,7 +164,7 @@ end
 wire [31:0] status;
 wire  [1:0] buttons;
 
-wire [15:0] joya, joyb;
+wire [15:0] joy0, joy1;
 wire [10:0] ps2_key;
 
 wire        ioctl_download;
@@ -184,32 +193,38 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 
 	.ps2_key(ps2_key),
 
-	.joystick_0(joya),
-	.joystick_1(joyb)
+	.joystick_0(joy0),
+	.joystick_1(joy1)
 );
 
 /////////////////  RESET  /////////////////////////
 
-wire reset = RESET | status[0] | buttons[1] | status[6] | ioctl_download;
+wire reset = RESET | status[0] | buttons[1] | ioctl_download;
 
 /////////////////  Memory  ////////////////////////
 
 wire [12:0] bios_a;
 wire  [7:0] bios_d;
 
-sprom #("bios.hex", 13) rom
+spram #(13,8,"bios.mif") rom
 (
 	.clock(clk_sys),
    .address(bios_a),
    .q(bios_d)
 );
 
-wire  [9:0] ram_a;
+wire [14:0] cpu_ram_a;
 wire        ram_we_n, ram_ce_n;
 wire  [7:0] ram_di;
 wire  [7:0] ram_do;
 
-spram #(10) ram
+wire [14:0] ram_a = (extram)            ? cpu_ram_a       :
+                    (status[5:4] == 1)  ? cpu_ram_a[12:0] : // 8k
+                    (status[5:4] == 0)  ? cpu_ram_a[9:0]  : // 1k
+                    (sg1000)            ? cpu_ram_a[12:0] : // SGM means 8k on SG1000
+                                          cpu_ram_a;        // SGM/32k
+
+spram #(15) ram
 (
 	.clock(clk_sys),
 	.address(ram_a),
@@ -232,27 +247,48 @@ spram #(14) vram
 	.q(vram_di)
 );
 
-wire [14:0] cart_a;
+wire [19:0] cart_a;
 wire  [7:0] cart_d;
+wire        cart_rd;
 
-dpram #(15) cart
+reg [5:0] cart_pages;
+always @(posedge clk_sys) if(ioctl_wr) cart_pages <= ioctl_addr[19:14];
+
+assign SDRAM_CLK = ~clk_sys;
+sdram sdram
 (
-	.clk_a_i(clk_sys),
-	.we_i(ioctl_wr && !ioctl_addr[24:15]),
-	.addr_a_i(ioctl_addr[14:0]),
-	.data_a_i(ioctl_dout),
+	.*,
+	.init(~pll_locked),
+	.clk(clk_sys),
 
-	.clk_b_i(clk_sys),
-	.addr_b_i(cart_a),
-	.data_b_o(cart_d)
+   .wtbt(0),
+   .addr(ioctl_download ? ioctl_addr : cart_a),
+   .rd(cart_rd),
+   .dout(cart_d),
+   .din(ioctl_dout),
+   .we(ioctl_wr),
+   .ready()
 );
+
+reg sg1000 = 0;
+reg extram = 0;
+always @(posedge clk_sys) begin
+	if(ioctl_wr) begin
+		if(!ioctl_addr) begin
+			extram <= 0;
+			sg1000 <= (ioctl_index[4:0] == 2);
+		end
+		if(ioctl_addr[24:13] == 1 && sg1000) extram <= (!ioctl_addr[12:0] | extram) & &ioctl_dout; // 2000-3FFF on SG-1000
+	end
+end
+
 
 ////////////////  Console  ////////////////////////
 
-wire [7:0] audio;
-assign AUDIO_L = {audio,8'd0};
-assign AUDIO_R = {audio,8'd0};
-assign AUDIO_S = 1;
+wire [10:0] audio;
+assign AUDIO_L = {audio,5'd0};
+assign AUDIO_R = {audio,5'd0};
+assign AUDIO_S = 0;
 assign AUDIO_MIX = 0;
 
 assign CLK_VIDEO = clk_sys;
@@ -271,12 +307,17 @@ wire [7:0] R,G,B;
 wire hblank, vblank;
 wire hsync, vsync;
 
+wire [15:0] joya = status[3] ? joy1 : joy0;
+wire [15:0] joyb = status[3] ? joy0 : joy1;
+
 cv_console console
 (
 	.clk_i(clk_sys),
 	.clk_en_10m7_i(ce_10m7),
 	.reset_n_i(~reset),
 	.por_n_o(),
+	.sg1000(sg1000),
+	.dahjeeA_i(extram),
 
 	.ctrl_p1_i(ctrl_p1),
 	.ctrl_p2_i(ctrl_p2),
@@ -287,11 +328,13 @@ cv_console console
 	.ctrl_p7_i(ctrl_p7),
 	.ctrl_p8_o(ctrl_p8),
 	.ctrl_p9_i(ctrl_p9),
+	.joy0_i(~{|joya[13:6], 1'b0, joya[5:0]}),
+	.joy1_i(~{|joyb[13:6], 1'b0, joyb[5:0]}),
 
 	.bios_rom_a_o(bios_a),
 	.bios_rom_d_i(bios_d),
 
-	.cpu_ram_a_o(ram_a),
+	.cpu_ram_a_o(cpu_ram_a),
 	.cpu_ram_we_n_o(ram_we_n),
 	.cpu_ram_ce_n_o(ram_ce_n),
 	.cpu_ram_d_i(ram_di),
@@ -302,8 +345,10 @@ cv_console console
 	.vram_d_o(vram_do),
 	.vram_d_i(vram_di),
 
+	.cart_pages_i(cart_pages),
 	.cart_a_o(cart_a),
 	.cart_d_i(cart_d),
+	.cart_rd(cart_rd),
 
 	.rgb_r_o(R),
 	.rgb_g_o(G),
@@ -316,6 +361,12 @@ cv_console console
 	.audio_o(audio)
 );
 
+assign VGA_F1 = 0;
+assign VGA_SL = sl[1:0];
+
+wire [2:0] scale = status[9:7];
+wire [2:0] sl = scale ? scale - 1'd1 : 3'd0;
+
 video_mixer #(.LINE_LENGTH(290)) video_mixer
 (
 	.*,
@@ -323,7 +374,7 @@ video_mixer #(.LINE_LENGTH(290)) video_mixer
 	.ce_pix(ce_5m3),
 	.ce_pix_out(CE_PIXEL),
 
-	.scanlines({scale == 3, scale == 2}),
+	.scanlines(0),
 	.scandoubler(scale || forced_scandoubler),
 	.hq2x(scale==1),
 

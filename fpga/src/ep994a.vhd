@@ -108,7 +108,7 @@ entity ep994a is
     vblank_o        : out std_logic;
     comp_sync_n_o   : out std_logic;
     -- Audio Interface --------------------------------------------------------
-    audio_total_o   : out signed(15 downto 0);
+    audio_total_o   : out std_logic_vector(10 downto 0);
 			  -- DEBUG (PS2 KBD port)
 			  --DEBUG1		: out std_logic;
 			  --DEBUG2		: out std_logic;
@@ -132,13 +132,6 @@ end ep994a;
 use std.textio.all;
 -- pragma translate_on
 
-use work.tech_comp_pack.cv_por;
-use work.cv_comp_pack.cv_clock;
-use work.cv_comp_pack.cv_ctrl;
-use work.cv_comp_pack.cv_addr_dec;
-use work.cv_comp_pack.cv_bus_mux;
-use work.vdp18_core_comp_pack.vdp18_core;
-use work.sn76489_comp_pack.sn76489_top;
 use work.tispeechsyn;
 
 architecture Behavioral of ep994a is
@@ -236,7 +229,7 @@ architecture Behavioral of ep994a is
   signal psg_ready_s      : std_logic;
 	signal tms9919_we		: std_logic;		-- write enable pulse for the audio "chip"
 	signal audio_data_out: std_logic_vector(7 downto 0);
-   signal audio_o       : signed(7 downto 0);
+   signal audio_o      : std_logic_vector( 7 downto 0);
 	
 	-- disk subsystem
 	signal cru1100			: std_logic;		-- disk controller CRU select
@@ -410,24 +403,24 @@ begin
   -----------------------------------------------------------------------------
   -- Reset generation
   -----------------------------------------------------------------------------
-  por_b : cv_por
+  por_b : work.cv_por
     port map (
       clk_i   => clk_i,
       por_n_o => por_n_s
     );
   por_n_o   <= por_n_s;
-  reset_n_s <= por_n_s and reset_n_i;
+  reset_n_s <= reset_n_i;--por_n_s and reset_n_i;
 
 
   -----------------------------------------------------------------------------
   -- Clock generation
   -----------------------------------------------------------------------------
-  clock_b : cv_clock
+  clock_b : work.cv_clock
     port map (
       clk_i         => clk_i,
       clk_en_10m7_i => clk_en_10m7_i,
       reset_n_i     => reset_n_s,
-      clk_en_3m58_o => clk_en_3m58_s
+      clk_en_3m58_p_o => clk_en_3m58_s
     );
 
   --clk_en_cpu_s  <= clk_en_3m58_s and psg_ready_s and not m1_wait_q;
@@ -992,7 +985,7 @@ begin
   -----------------------------------------------------------------------------
   -- TMS9928A Video Display Processor
   -----------------------------------------------------------------------------
-  vdp18_b : vdp18_core
+  vdp18_b : work.vdp18_core
     generic map (
       is_pal_g      => is_pal_g,
       compat_rgb_g  => compat_rgb_g
@@ -1055,7 +1048,7 @@ begin
   -----------------------------------------------------------------------------
   -- SN76489 Programmable Sound Generator
   -----------------------------------------------------------------------------
-  psg_b : sn76489_top
+  psg_b : work.sn76489_top
     generic map (
       clock_div_16_g => 1
     )
@@ -1151,8 +1144,7 @@ begin
 			 sr_data_i => sr_data_i
         );
 		  
-	audio_total_o <= shift_left(resize(audio_o, audio_total_o'length)
-										+resize(speech_o,audio_total_o'length), natural(7));
+	audio_total_o <= audio_o & "000";-- + speech_o;
 		  
 end Behavioral;
 

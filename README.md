@@ -1,3 +1,12 @@
+#TI-99/4A Core for MiSTer
+See below for original readme
+
+- Use the create-misterrom.cmd file to create the full bin file.
+- Requires 994aROM.BIN and 994AGROM.BIN files (speech ROMs are optional [speech not currently working]).
+- Load this as Full.bin
+- When loading carts, load C/G files before loading D files.
+
+
 # EP994A
 My TI-99/4A clone implemented with a TMS99105 CPU and FPGA (master branch).
 Another version of the clone (the latest development in soft-cpu branch) includes my own

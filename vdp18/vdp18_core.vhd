@@ -72,6 +72,7 @@
 
 library ieee;
 use ieee.std_logic_1164.all;
+use work.vdp18_pack.all;
 
 entity vdp18_core is
 
@@ -110,13 +111,6 @@ entity vdp18_core is
   );
 
 end vdp18_core;
-
-
-use work.vdp18_comp_pack.all;
-use work.vdp18_pack.opmode_t;
-use work.vdp18_pack.hv_t;
-use work.vdp18_pack.access_t;
-use work.vdp18_pack.to_boolean_f;
 
 architecture struct of vdp18_core is
 
@@ -194,7 +188,7 @@ begin
   -----------------------------------------------------------------------------
   -- Clock Generator
   -----------------------------------------------------------------------------
-  clk_gen_b : vdp18_clk_gen
+  clk_gen_b : work.vdp18_clk_gen
     port map (
       clk_i         => clk_i,
       clk_en_10m7_i => clk_en_10m7_i,
@@ -207,7 +201,7 @@ begin
   -----------------------------------------------------------------------------
   -- Horizontal and Vertical Timing Generator
   -----------------------------------------------------------------------------
-  hor_vert_b : vdp18_hor_vert
+  hor_vert_b : work.vdp18_hor_vert
     generic map (
       is_pal_g => is_pal_g
     )
@@ -234,7 +228,7 @@ begin
   -----------------------------------------------------------------------------
   -- Control Module
   -----------------------------------------------------------------------------
-  ctrl_b : vdp18_ctrl
+  ctrl_b : work.vdp18_ctrl
     port map (
       clk_i         => clk_i,
       clk_en_5m37_i => clk_en_5m37_s,
@@ -257,7 +251,7 @@ begin
   -----------------------------------------------------------------------------
   -- CPU I/O Module
   -----------------------------------------------------------------------------
-  cpu_io_b : vdp18_cpuio
+  cpu_io_b : work.vdp18_cpuio
     port map (
       clk_i         => clk_i,
       clk_en_10m7_i => clk_en_10m7_s,
@@ -298,7 +292,7 @@ begin
   -----------------------------------------------------------------------------
   -- VRAM Address Multiplexer
   -----------------------------------------------------------------------------
-  addr_mux_b : vdp18_addr_mux
+  addr_mux_b : work.vdp18_addr_mux
     port map (
       access_type_i => access_type_s,
       opmode_i      => opmode_s,
@@ -322,7 +316,7 @@ begin
   -----------------------------------------------------------------------------
   -- Pattern Generator
   -----------------------------------------------------------------------------
-  pattern_b : vdp18_pattern
+  pattern_b : work.vdp18_pattern
     port map (
       clk_i         => clk_i,
       clk_en_5m37_i => clk_en_5m37_s,
@@ -345,7 +339,7 @@ begin
   -----------------------------------------------------------------------------
   -- Sprite Generator
   -----------------------------------------------------------------------------
-  sprite_b : vdp18_sprite
+  sprite_b : work.vdp18_sprite
     port map (
       clk_i         => clk_i,
       clk_en_5m37_i => clk_en_5m37_s,
@@ -375,7 +369,7 @@ begin
   -----------------------------------------------------------------------------
   -- Color Multiplexer
   -----------------------------------------------------------------------------
-  col_mux_b : vdp18_col_mux
+  col_mux_b : work.vdp18_col_mux
     generic map (
       compat_rgb_g  => compat_rgb_g
     )

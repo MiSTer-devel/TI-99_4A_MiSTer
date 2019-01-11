@@ -1,4 +1,28 @@
 @echo off
+if not exist hole8k (
+echo "Missing hole8k file"
+exit
+)
+if not exist hole48k (
+echo "Missing hole48k file"
+exit
+)
+if not exist hole32k (
+echo "Missing hole32k file"
+exit
+)
+if not exist ..\firmware\994AGROM.Bin (
+echo "Missing ..\firmware\994AGROM.Bin file"
+exit
+)
+if not exist ..\firmware\994aROM.Bin (
+echo "Missing ..\firmware\994aROM.Bin file"
+exit
+)
+if not exist ..\firmware\SPCHROM.BIN (
+echo "Missing ..\firmware\SPCHROM.BIN file. Skipping"
+)
+
 REM GR 2018-06-02
 REM MiSTer Version is only 288K byte image
 REM Now using original 944AGROM.bin, since Turbo mode is now optional.
