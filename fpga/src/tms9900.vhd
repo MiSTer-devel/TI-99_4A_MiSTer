@@ -154,6 +154,7 @@ architecture Behavioral of tms9900 is
 	signal alu_arithmetic_gt : std_logic;
 	signal alu_flag_carry    : std_logic;
 	signal alu_flag_parity   : std_logic;
+	signal alu_flag_parity_source : std_logic;
 	
 	signal i_am_xop			 : boolean := False;
 	signal set_int_priority  : boolean := False;
@@ -181,6 +182,7 @@ architecture Behavioral of tms9900 is
 	signal mult_b : std_logic_vector(17 downto 0);
 	signal mult_product : std_logic_vector(35 downto 0);
 	signal dividend : std_logic_vector(31 downto 0);	-- for the divide instruction
+	signal divider_sub : std_logic_vector(16 downto 0);
 	
 	
 	component scratchpad is
@@ -326,12 +328,17 @@ begin
 	-- ST3 carry
 	alu_flag_carry    <= alu_out(16) when ope /= alu_sub else not alu_out(16);	-- for sub carry out is inverted
 	-- ST4 overflow
-	alu_flag_overflow <= '1' when ope /= alu_sla and arg1(15)=arg2(15) and alu_result(15) /= arg1(15) else 
+	alu_flag_overflow <= 
+		'1' when (ope = alu_compare or ope = alu_sub or ope = alu_abs)			                   and arg1(15) /= arg2(15) and alu_result(15) /= arg1(15) else 
+		'1' when (ope /= alu_sla and not (ope = alu_compare or ope = alu_sub or ope = alu_abs)) and arg1(15) =  arg2(15) and alu_result(15) /= arg1(15) else 
 		'1' when ope = alu_sla and alu_result(15) /= arg2(15) else -- sla condition: if MSB changes during shift
 		'0';
 	-- ST5 parity
 	alu_flag_parity <= alu_result(15) xor alu_result(14) xor alu_result(13) xor alu_result(12) xor 
 				       alu_result(11) xor alu_result(10) xor alu_result(9)  xor alu_result(8);
+		-- source parity used with CB and MOVB instructions
+	alu_flag_parity_source <= arg2(15) xor arg2(14) xor arg2(13) xor arg2(12) xor 
+				       arg2(11) xor arg2(10) xor arg2(9)  xor arg2(8);
 
 	-- Byte aligner
 	process(ea, rd_dat, operand_mode, operand_word)
@@ -831,7 +838,12 @@ begin
 						end if;	
 						-- Byte operations set parity
 						if not operand_word then
-							st(10) <= alu_flag_parity;
+							-- parity bit for MOVB and CB is set differently and only depends on source operand
+							if ir(15 downto 13) = "100" or ir(15 downto 13) = "110" then
+								st(10) <= alu_flag_parity_source;	-- MOVB, CB
+							else
+								st(10) <= alu_flag_parity;
+							end if;
 						end if;					
 						-- Store the result except with compare instruction.
 						if ir(15 downto 13) = "100" then
@@ -1342,15 +1354,14 @@ begin
 					when do_div2 =>
 						delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(2*cycle_clks_g, 16));
 						dividend(31 downto 0) <= dividend(30 downto 0) & '0'; -- shift left
-						arg1 <= dividend(30 downto 15);	-- shifted data to ALU too
-						arg2 <= reg_t;
-						ope <= alu_sub;		
+						-- perform 17-bit substraction, picking up the bit to shifted out too
+						divider_sub <= std_logic_vector(unsigned(dividend(31 downto 15)) - unsigned('0' & reg_t));
 						dec_shift_count := True;	-- decrement count				
 						cpu_state <= do_div3;
 					when do_div3 =>
-						if alu_result(15)='0' then	
+						if divider_sub(16)='0' then	
 							-- successful subtract
-							dividend(31 downto 16) <= alu_result;
+							dividend(31 downto 16) <= divider_sub(15 downto 0);
 							dividend(0) <= '1';
 						end if;
 						if shift_count /= "00000" then
