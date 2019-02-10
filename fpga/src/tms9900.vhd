@@ -1286,7 +1286,8 @@ begin
 								mult_a <= "00" & reg_t;
 								mult_b <= "00" & rd_dat;
 								cpu_state <= do_mul_store0;
-								delay_count <= "00000100";
+								--delay_count <= "00000100";
+								delay_count <= "00010100";
 							when "111" => -- DIV
 								--delay_ir_wait done elsewhere
 								-- we need here dest - source operation
