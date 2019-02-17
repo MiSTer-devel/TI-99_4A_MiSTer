@@ -128,14 +128,16 @@ parameter CONF_STR = {
 	"OA,Turbo,Off,On;",
 	"R0,Reset;",
 	"-;",
+	"OB,Swap joysticks,NO,YES;",
 	"-;",
 	"-;",
-	"J,Fire 1,Fire 2,1,2,3;",
+	"J,Fire 1,Fire 2,1,2,3,Enter,Back,Redo;",
 	"V,v",`BUILD_DATE
 };
 
 wire reset_osd = status[0];
 wire turbo     = status[10];
+wire joy_swap = status[11];
 
 /////////////////  CLOCKS  ////////////////////////
 
@@ -204,7 +206,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 reg [7:0] download_reset_cnt;
 wire download_reset = download_reset_cnt != 0;
 always @(posedge CLK_50M) begin
-	if(ioctl_download || reset_osd) download_reset_cnt <= 8'd255;
+	if(ioctl_download || reset_osd || buttons[1] || RESET) download_reset_cnt <= 8'd255;
 	else if(download_reset_cnt != 0) download_reset_cnt <= download_reset_cnt - 8'd1;
 end
 
@@ -523,16 +525,16 @@ reg btn_left  = 0;
 reg btn_right = 0;
 reg btn_fire  = 0;
 
-wire m_right2  = joy1[0];
-wire m_left2   = joy1[1];
-wire m_down2   = joy1[2];
-wire m_up2     = joy1[3];
-wire m_fire2   = joy1[4];
-wire m_right  = btn_right | joy0[0];
-wire m_left   = btn_left  | joy0[1];
-wire m_down   = btn_down  | joy0[2];
-wire m_up     = btn_up    | joy0[3];
-wire m_fire   = btn_fire  | joy0[4];
+wire m_right2  = joy_swap ? joy0[0] : joy1[0];
+wire m_left2   = joy_swap ? joy0[1] : joy1[1];
+wire m_down2   = joy_swap ? joy0[2] : joy1[2];
+wire m_up2     = joy_swap ? joy0[3] : joy1[3];
+wire m_fire2   = joy_swap ? joy0[4] : joy1[4];
+wire m_right  = btn_right | (joy_swap ? joy1[0] : joy0[0]);
+wire m_left   = btn_left  | (joy_swap ? joy1[1] : joy0[1]);
+wire m_down   = btn_down  | (joy_swap ? joy1[2] : joy0[2]);
+wire m_up     = btn_up    | (joy_swap ? joy1[3] : joy0[3]);
+wire m_fire   = btn_fire  | (joy_swap ? joy1[4] : joy0[4]);
 //wire m_arm    = btn_arm   | joy0[5];
 //wire m_1      = btn_1     | joy0[9];
 //wire m_2      = btn_2     | joy0[10];
@@ -544,15 +546,19 @@ wire m_fire   = btn_fire  | joy0[4];
 //wire m_bt     = btn_bt    | joy0[13];
 //Parsec uses keys 1,2,3: Make these joystick buttons for convenience
 //Also can be used to select menu on boot
-wire m_1 = btn_1 | joy0[5] | joy1[5];
-wire m_2 = btn_2 | joy0[6] | joy1[6];
-wire m_3 = btn_3 | joy0[7] | joy1[7];
+wire m_1  = btn_1 | joy0[5] | joy1[5];
+wire m_2  = btn_2 | joy0[6] | joy1[6];
+wire m_3  = btn_3 | joy0[7] | joy1[7];
+wire m_en = btn_en | joy0[8] | joy1[8];
+wire m_8  = btn_8 | joy0[9] | joy1[9];
+wire m_9  = btn_9 | joy0[10] | joy1[10];
+wire m_fn = btn_fn | joy0[9] | joy1[9] | joy0[10] | joy1[10];
 
 wire [7:0] keys0 = {btn_eq, btn_pe, btn_co, btn_m,  btn_n,  btn_fs, m_fire,  m_fire2};        // last=fire2
 wire [7:0] keys1 = {btn_sp, btn_l,  btn_k,  btn_j,  btn_h,  btn_se, m_left,  m_left2};        // last=left2
-wire [7:0] keys2 = {btn_en, btn_o,  btn_i,  btn_u,  btn_y,  btn_p,  m_right, m_right2};       // last=right2
-wire [7:0] keys3 = {1'b0,   btn_9,  btn_8,  btn_7,  btn_6,  btn_0,  m_down,  m_down2};        // last=down2
-wire [7:0] keys4 = {btn_fn, m_2,    m_3,    btn_4,  btn_5,  m_1,    m_up,    m_up2};          // last=up2/al
+wire [7:0] keys2 = {m_en,   btn_o,  btn_i,  btn_u,  btn_y,  btn_p,  m_right, m_right2};       // last=right2
+wire [7:0] keys3 = {1'b0,   m_9,    m_8,    btn_7,  btn_6,  btn_0,  m_down,  m_down2};        // last=down2
+wire [7:0] keys4 = {m_fn,   m_2,    m_3,    btn_4,  btn_5,  m_1,    m_up,    m_up2};          // last=up2/al
 wire [7:0] keys5 = {btn_sh, btn_s,  btn_d,  btn_f,  btn_g,  btn_a,  1'b0,      1'b0};         // last=
 wire [7:0] keys6 = {btn_ct, btn_w,  btn_e,  btn_r,  btn_t,  btn_q,  1'b0,      1'b0};         // last=
 wire [7:0] keys7 = {1'b0,   btn_x,  btn_c,  btn_v,  btn_b,  btn_z,  1'b0,      1'b0};         // last=

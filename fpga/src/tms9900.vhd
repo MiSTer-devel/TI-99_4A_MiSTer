@@ -1504,6 +1504,15 @@ begin
 						-- Writeback the result in reg_stcr. 
 						-- For byte operation support, we need to read the destination before writing
 						-- to it. reg_t2 has the destination address.
+						st(15) <= '0';
+						st(14) <= '0';
+						st(13) <= '1';
+						st(12) <= '0';
+						if (reg_stcr /= x"0000") then
+							st(15) <= '1';
+							st(13) <= '0';
+							st(14) <= not reg_stcr(15);
+						end if;
 						ea <= reg_t2;
 						cpu_state <= do_read;
 						cpu_state_next <= do_stcr7;
