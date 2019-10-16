@@ -682,6 +682,13 @@ begin
 							operand_mode <= rd_dat(5 downto 0);
 							cpu_state <= do_source_address0;
 							cpu_state_operand_return <= do_branch_b_bl;
+						elsif 
+						   rd_dat(15 downto 9)  = "0000000" or     --illegal (0000-01FF)
+						   rd_dat(15 downto 5)  = "00000011001" or --illegal (0320-033F)
+						   rd_dat(15 downto 7)  = "000001111" or   --illegal (0780-07FF)
+						   rd_dat(15 downto 10) = "000011" then    --illegal (0C00-0FFF)
+							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(6*cycle_clks_g, 16));
+							cpu_state <= do_fetch;		-- 6 cycles delay then next instruction
 						else
 							cpu_state <= do_stuck;		-- unknown instruction, let's get stuck
 						end if;
