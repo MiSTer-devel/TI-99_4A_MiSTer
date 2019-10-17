@@ -636,6 +636,7 @@ begin
 				if MEM_n = '0' and go_write = '1' 
 					and cpu_addr(15 downto 12) /= x"9"			-- 9XXX addresses don't go to RAM
 					and cpu_addr(15 downto 11) /= x"8" & '1'	-- 8800-8FFF don't go to RAM
+					and cpu_addr(15 downto 13) /= "000"			-- 0000-1FFF don't go to RAM
 					and cartridge_cs='0' 							-- writes to cartridge region do not go to RAM
 					then
 						cpu_mem_write_pending <= '1';
