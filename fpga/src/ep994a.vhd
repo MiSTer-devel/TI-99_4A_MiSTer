@@ -117,6 +117,7 @@ entity ep994a is
 			  --SWI       : in std_logic_vector(7 downto 0);
 			  -- SWI 0: when set, CPU will automatically be taken out of reset after copying FLASH to RAM.
 
+	speech_i         : in  std_logic;
 	sr_re_o          : out std_logic;
 	sr_addr_o        : out std_logic_vector(14 downto 0);
 	sr_data_i        : in  std_logic_vector( 7 downto 0);
@@ -970,7 +971,8 @@ begin
 	vdp_data_out(7 downto 0) <= x"00";
 	data_to_cpu <= 
 		vdp_data_out         			when sams_regs(6)='0' and cpu_addr(15 downto 10) = "100010" else	-- 10001000..10001011 (8800..8BFF)
-		speech_data_out & x"00"       when sams_regs(6)='0' and cpu_addr(15 downto 10) = "100100" else	-- speech address read (9000..93FF)
+		speech_data_out & x"00"       when sams_regs(6)='0' and cpu_addr(15 downto 10) = "100100" and speech_i='1' else	-- speech address read (9000..93FF)
+		x"6000"                       when sams_regs(6)='0' and cpu_addr(15 downto 10) = "100100" and speech_i='0' else	-- speech address read (9000..93FF)
 		grom_data_out & x"00" 			when sams_regs(6)='0' and cpu_addr(15 downto 8) = x"98" and cpu_addr(1)='1' else	-- GROM address read
 		pager_data_out(7 downto 0) & pager_data_out(7 downto 0) when paging_registers = '1' else	-- replicate pager values on both hi and lo bytes
 		sram_16bit_read_bus(15 downto 8) & x"00" when sams_regs(6)='0' and cpu_addr(15 downto 8) = x"98" and cpu_addr(1)='0' and grom_ram_addr(0)='0' and grom_selected='1' else
