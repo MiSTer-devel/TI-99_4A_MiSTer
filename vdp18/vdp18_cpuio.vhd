@@ -299,8 +299,8 @@ begin
       end if;
 
       -- Fifth sprite handling ------------------------------------------------
-      if    spr_5th_i and not sprite_5th_q then
-        sprite_5th_q     <= true;
+      if     not sprite_5th_q then
+        sprite_5th_q     <= spr_5th_i;
         sprite_5th_num_q <= spr_5th_num_i;
       elsif destr_rd_status_s then
         sprite_5th_q     <= false;

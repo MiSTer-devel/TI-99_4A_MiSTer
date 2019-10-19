@@ -374,12 +374,13 @@ begin
   begin
     -- default assignments
     spr_5th_o         <= false;
-    spr_5th_num_o     <= (others => '0');
+    spr_5th_num_o     <= std_logic_vector(sprite_num_q);
 
     if clk_en_acc_i and access_type_i = AC_STST then
       if sprite_visible_s and sprite_idx_q = 4 then
         spr_5th_o     <= true;
-        spr_5th_num_o <= std_logic_vector(sprite_num_q);
+        --Always output current sprite number.  Latched elsewhere by spr_5th_o.
+        --spr_5th_num_o <= std_logic_vector(sprite_num_q);
       end if;
     end if;
   end process fifth;
