@@ -143,6 +143,7 @@ parameter CONF_STR = {
 	"F,BIN,Load D.bin;",
 	"F,BIN,Load G.bin;",
 	"OD,Cart Type,Normal,MBX;",
+	"OE,Scratchpad RAM,256B,1KB;",
 	"O1,Aspect ratio,4:3,16:9;",
 	"O79,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"OA,Turbo,Off,On;",
@@ -156,11 +157,12 @@ parameter CONF_STR = {
 	"V,v",`BUILD_DATE
 };
 
-wire reset_osd = status[0];
-wire turbo     = status[10];
-wire speech    = status[12];
-wire joy_swap  = status[11];
-wire mbx       = status[13];
+wire reset_osd  = status[0];
+wire turbo      = status[10];
+wire speech     = status[12];
+wire joy_swap   = status[11];
+wire mbx        = status[13];
+wire scratch_1k = status[14];
 
 /////////////////  CLOCKS  ////////////////////////
 
@@ -379,6 +381,7 @@ ep994a console
 	.sr_addr_o(speech_a),
 	.sr_data_i(speech_d),
 	
+	.scratch_1k_i(scratch_1k),
 	.mbx_i(mbx),
 	.rom_mask_i(rom_mask),
 	.flashloading_i(download_reset),

@@ -122,6 +122,7 @@ entity ep994a is
 	sr_addr_o        : out std_logic_vector(14 downto 0);
 	sr_data_i        : in  std_logic_vector( 7 downto 0);
 			  
+	scratch_1k_i     : in std_logic;
 	mbx_i            : in std_logic;
 	rom_mask_i       : in std_logic;
 	flashloading_i   : in std_logic;
@@ -627,7 +628,11 @@ begin
 					elsif cpu_addr(15 downto 10) = "100000" then
 						-- now that paging is introduced we need to move scratchpad (1k here)
 						-- out of harm's way. Scartchpad at B8000 to keep it safe from paging.
-						sram_addr_bus <= x"B8" & "00" & cpu_addr(9 downto 1);
+						if scratch_1k_i='1' then
+							sram_addr_bus <= x"B8" & "00" & cpu_addr(9 downto 1);
+						else
+							sram_addr_bus <= x"B8" & X"3" & cpu_addr(7 downto 1);
+						end if;
 					else
 						-- regular RAM access
 						-- Top 256K is CPU SAMS RAM for now, so we have 18 bit memory addresses for RAM
