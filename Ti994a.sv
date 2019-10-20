@@ -142,6 +142,7 @@ parameter CONF_STR = {
 	"F,BIN,Load Full or C.bin;",
 	"F,BIN,Load D.bin;",
 	"F,BIN,Load G.bin;",
+	"OD,Cart Type,Normal,MBX;",
 	"O1,Aspect ratio,4:3,16:9;",
 	"O79,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"OA,Turbo,Off,On;",
@@ -159,6 +160,7 @@ wire reset_osd = status[0];
 wire turbo     = status[10];
 wire speech    = status[12];
 wire joy_swap  = status[11];
+wire mbx       = status[13];
 
 /////////////////  CLOCKS  ////////////////////////
 
@@ -377,6 +379,7 @@ ep994a console
 	.sr_addr_o(speech_a),
 	.sr_data_i(speech_d),
 	
+	.mbx_i(mbx),
 	.rom_mask_i(rom_mask),
 	.flashloading_i(download_reset),
 	.turbo_i(turbo)

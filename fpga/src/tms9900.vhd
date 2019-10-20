@@ -207,8 +207,9 @@ architecture Behavioral of tms9900 is
 		signal scratchpad_en : out std_logic
 	) is
 	begin
-		addr <= pc;
-		pc <= std_logic_vector(unsigned(pc) + to_unsigned(2,16));
+		-- pc is only top 15 bits
+		addr <= pc(15 downto 1) & "0";
+		pc <= std_logic_vector(unsigned(pc(15 downto 1) & "0") + to_unsigned(2,16));
 		if pc(15 downto 8) = x"83" and scratch_en='1' then
 			-- scratchpad support begin
 			scratchpad_wr <= '0';
@@ -401,8 +402,9 @@ begin
 				-- memory opperations --
 				------------------------
 					when do_pc_read =>
-						addr <= pc;
-						pc <= std_logic_vector(unsigned(pc) + to_unsigned(2,16));
+						-- pc is only top 15 bits
+						addr <= pc(15 downto 1) & "0";
+						pc <= std_logic_vector(unsigned(pc(15 downto 1) & "0") + to_unsigned(2,16));
 						if pc(15 downto 8) = x"83" and scratch_en='1' then
 							-- scratchpad support begin
 							scratchpad_wr <= '0';

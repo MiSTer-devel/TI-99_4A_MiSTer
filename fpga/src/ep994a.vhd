@@ -122,6 +122,7 @@ entity ep994a is
 	sr_addr_o        : out std_logic_vector(14 downto 0);
 	sr_data_i        : in  std_logic_vector( 7 downto 0);
 			  
+	mbx_i            : in std_logic;
 	rom_mask_i       : in std_logic;
 	flashloading_i   : in std_logic;
 	turbo_i          : in std_logic
@@ -638,7 +639,8 @@ begin
 					and cpu_addr(15 downto 12) /= x"9"			-- 9XXX addresses don't go to RAM
 					and cpu_addr(15 downto 11) /= x"8" & '1'	-- 8800-8FFF don't go to RAM
 					and cpu_addr(15 downto 13) /= "000"			-- 0000-1FFF don't go to RAM
-					and cartridge_cs='0' 							-- writes to cartridge region do not go to RAM
+					and (cartridge_cs='0' 							-- writes to cartridge region do not go to RAM
+						or (mbx_i='1' and cpu_addr(15 downto 10) = "011011"))
 					then
 						cpu_mem_write_pending <= '1';
 				end if;
