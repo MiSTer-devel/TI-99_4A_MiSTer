@@ -25,6 +25,7 @@ set_global_assignment -name VHDL_FILE cv_por.vhd
 set_global_assignment -name VHDL_FILE "fpga/src/ep994a.vhd"
 set_global_assignment -name VHDL_FILE "fpga/src/gromext.vhd"
 set_global_assignment -name VHDL_FILE "fpga/src/pager612.vhd"
+set_global_assignment -name VHDL_FILE "fpga/src/plc10_speech_synthetizer.vhd"
 set_global_assignment -name VHDL_FILE "fpga/src/scratchpad.vhd"
 set_global_assignment -name VHDL_FILE "fpga/src/tispeechsyn.vhd"
 set_global_assignment -name VHDL_FILE "fpga/src/tms5220.vhd"

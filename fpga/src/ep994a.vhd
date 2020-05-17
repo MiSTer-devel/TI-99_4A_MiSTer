@@ -1154,7 +1154,7 @@ begin
 			 sr_data_i => sr_data_i
         );
 		  
-	audio_total_o <= audio_o & "000";-- + speech_o;
+	audio_total_o <= std_logic_vector(unsigned("0" & audio_o & "0") + unsigned("00" & speech_o) + to_unsigned(128,10)) & "0";
 		  
 end Behavioral;
 
