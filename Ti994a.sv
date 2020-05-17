@@ -201,6 +201,7 @@ wire        ioctl_wr;
 wire [24:0] ioctl_addr;
 wire  [7:0] ioctl_dout;
 wire        forced_scandoubler;
+wire [21:0] gamma_bus;
 
 hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 (
@@ -212,6 +213,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3)) hps_io
 	.buttons(buttons),
 	.status(status),
 	.forced_scandoubler(forced_scandoubler),
+	.gamma_bus(gamma_bus),
 
 	.ioctl_download(ioctl_download),
 	.ioctl_index(ioctl_index),
@@ -400,10 +402,11 @@ always @(posedge CLK_VIDEO) begin
 	if(~hs_o & ~hsync) vs_o <= ~vsync;
 end
 
-video_mixer #(.LINE_LENGTH(290)) video_mixer
+video_mixer #(.LINE_LENGTH(290), .GAMMA(1)) video_mixer
 (
 	.*,
 
+	.clk_vid(CLK_VIDEO),
 	.ce_pix(ce_5m3),
 	.ce_pix_out(CE_PIXEL),
 
