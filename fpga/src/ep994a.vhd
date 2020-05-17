@@ -117,7 +117,7 @@ entity ep994a is
 			  --SWI       : in std_logic_vector(7 downto 0);
 			  -- SWI 0: when set, CPU will automatically be taken out of reset after copying FLASH to RAM.
 
-	speech_i         : in  std_logic;
+	speech_model     : in  std_logic_vector( 1 downto 0);
 	sr_re_o          : out std_logic;
 	sr_addr_o        : out std_logic_vector(14 downto 0);
 	sr_data_i        : in  std_logic_vector( 7 downto 0);
@@ -240,6 +240,8 @@ architecture Behavioral of ep994a is
 	-- Speech signals
 	signal speech_data_out	: std_logic_vector(7 downto 0);
    signal speech_o       : signed(7 downto 0);
+	signal speech_conv    : unsigned(10 downto 0);
+	signal speech_i       : std_logic;
 	
 	-- SAMS memory extension
 	signal sams_regs			: std_logic_vector(7 downto 0) := x"00";
@@ -495,6 +497,7 @@ begin
 	epGPIO_o(1) <= '0' when cru9901(20 downto 18) = "110" else '1'; 	-- col#6
 	epGPIO_o(0) <= '0' when cru9901(20 downto 18) = "111" else '1'; 	-- col#7
 	-------------------------------------
+	speech_i <= '0' when speech_model = "11" else '1';
 	
 	switch <= not reset_n_s;
 	mem_read_rq <= '0';
@@ -1151,10 +1154,12 @@ begin
 			 aout_o => speech_o,
 			 sr_re_o => sr_re_o,
 			 sr_addr_o => sr_addr_o,
-			 sr_data_i => sr_data_i
+			 sr_data_i => sr_data_i,
+			 model => speech_model
         );
 		  
-	audio_total_o <= std_logic_vector(unsigned("0" & audio_o & "0") + unsigned("00" & speech_o) + to_unsigned(128,10)) & "0";
-		  
+	speech_conv <= unsigned(resize(speech_o,speech_conv'length)) + to_unsigned(128,11) when speech_i = '1' else to_unsigned(0,speech_conv'length);
+	audio_total_o <= std_logic_vector(unsigned("0" & audio_o & "00") + speech_conv);
+	  
 end Behavioral;
 

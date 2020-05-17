@@ -147,7 +147,7 @@ parameter CONF_STR = {
 	"O1,Aspect ratio,4:3,16:9;",
 	"O79,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%;",
 	"OA,Turbo,Off,On;",
-	"OC,Speech,Off,On;",
+	"OGH,Speech,Off,5220,5200;",
 	"R0,Reset;",
 	"-;",
 	"OB,Swap joysticks,NO,YES;",
@@ -159,10 +159,10 @@ parameter CONF_STR = {
 
 wire reset_osd  = status[0];
 wire turbo      = status[10];
-wire speech     = status[12];
 wire joy_swap   = status[11];
 wire mbx        = status[13];
 wire scratch_1k = status[14];
+wire [1:0] speech_mod = ~status[17:16];
 
 /////////////////  CLOCKS  ////////////////////////
 
@@ -376,7 +376,7 @@ ep994a console
 
 	.audio_total_o(audio),
 	
-	.speech_i(speech),
+	.speech_model(speech_mod),
 	.sr_re_o(),
 	.sr_addr_o(speech_a),
 	.sr_data_i(speech_d),

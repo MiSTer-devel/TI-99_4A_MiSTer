@@ -29,6 +29,7 @@ use work.LPC10_Speech_Synthetizer;
 entity tms5220 is
 	port
 	(
+		model     : in STD_LOGIC_VECTOR (1 downto 0);
 		reset     : in STD_LOGIC;
 		clk_i     : in STD_LOGIC;
 		ce_n_i    : in STD_LOGIC;
@@ -104,30 +105,30 @@ begin
 		ClkCounter <= not ClkCounter(6) & b"000000";
 	end if;
 	Clk512kHz <= ClkCounter(6);
---	case std_logic_vector(to_signed(SampleData, 10))(9 downto 7) is
---			when (b"011") =>
---				aout_o <= x"7F";
---			when (b"010") =>
---				aout_o <= x"7F";
---			when (b"001") =>
---				aout_o <= x"7F";
---			when (b"100") =>
---				aout_o <= x"80";
---			when (b"101") =>
---				aout_o <= x"80";
---			when (b"110") =>
---				aout_o <= x"80";
---			when others =>
---				aout_o <= to_signed(SampleData, 10)(7 downto 0);
---			end case;
-	case std_logic_vector(to_signed(SampleData, 10))(9 downto 8) is
-			when (b"01") =>
+	case std_logic_vector(to_signed(SampleData, 10))(9 downto 7) is
+			when (b"011") =>
 				aout_o <= x"7F";
-			when (b"10") =>
+			when (b"010") =>
+				aout_o <= x"7F";
+			when (b"001") =>
+				aout_o <= x"7F";
+			when (b"100") =>
+				aout_o <= x"80";
+			when (b"101") =>
+				aout_o <= x"80";
+			when (b"110") =>
 				aout_o <= x"80";
 			when others =>
-				aout_o <= to_signed(SampleData, 10)(8 downto 1);
+				aout_o <= to_signed(SampleData, 10)(7 downto 0);
 			end case;
+--	case std_logic_vector(to_signed(SampleData, 10))(9 downto 8) is
+--			when (b"01") =>
+--				aout_o <= x"7F";
+--			when (b"10") =>
+--				aout_o <= x"80";
+--			when others =>
+--				aout_o <= to_signed(SampleData, 10)(8 downto 1);
+--			end case;
   end if;
 
 end process;
@@ -140,14 +141,15 @@ begin
 end process;
 
   SpeechSynth : LPC10_Speech_Synthetizer
-    generic map (is_5200_g => 1)
+--    generic map (is_5200_g => 1)
     port map (
 	 Clk512kHz   => Clk512kHz,
 	 StartSpeak  => not start_speaking, -- -N
 	 RomData     => LpcData,
 	 RomAdr      => RomAdr,
 	 SampleData  => SampleData,
-	 Speaking    => speaking
+	 Speaking    => speaking,
+	 Model       => model
     );
 
 	--only used when m1_o is high

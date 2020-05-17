@@ -9,16 +9,17 @@ library ieee;
 use ieee.std_logic_1164.all,ieee.numeric_std.all;
 
 entity lpc10_speech_synthetizer is
-generic (
-  is_5200_g  : integer := 0
-);
+--generic (
+--  Model  : integer := 0
+--);
 port(
   Clk512kHz   : in std_logic;
   StartSpeak  : in std_logic;
   RomData     : in std_logic;
   RomAdr      : out std_logic_vector(11 downto 0);
   SampleData  : out integer range -512 to 511;
-  Speaking    : out std_logic
+  Speaking    : out std_logic;
+  Model       : in std_logic_vector(1 downto 0) -- 0 = default, -- 1 = 5200, --2 = 5220
 
 --Resultats Intermediaires pour les essais
 --E_Out       : out integer range -512 to 511;
@@ -75,7 +76,7 @@ constant TabChirp_5200 : Chirp_ARRAY := (
 
 type Energy_ARRAY is array(0 to 15) of int10b;
 constant TabEnergy_default : Energy_ARRAY := (
- 0, 0, 1, 1, 2, 3, 5, 7, 10, 15, 21, 30, 43, 61, 86, 0 );
+ 0, 0, 1, 1, 2, 3, 5,  7, 10, 15, 21, 30, 43, 61,  86, 0 );
 constant TabEnergy_5200 : Energy_ARRAY := (
  0, 1, 2, 3, 4, 6, 8, 11, 16, 23, 33, 47, 63, 85, 114, 0 );
  
@@ -92,6 +93,11 @@ constant TabPitch_5200 : Pitch_ARRAY := (
  29,  30,  31,  32,  34,  36,  38,  40,  41,  43,  45,  48,  49,  51,  54,  55,
  57,  60,  62,  64,  68,  72,  74,  76,  81,  85,  87,  90,  96,  99, 103, 107,
 112, 117, 122, 127, 133, 139, 145, 151, 157, 164, 171, 178, 186, 194, 202, 211 );
+constant TabPitch_5220 : Pitch_ARRAY := (
+  0,  15,  16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,
+ 30,  31,  32,  33,  34,  35,  36,  37,  38,  39,  40,  41,  42,  44,  46,  48,
+ 50,  52,  53,  56,  58,  60,  62,  65,  68,  70,  72,  76,  78,  80,  84,  86,
+ 91,  94,  98, 101, 105, 109, 114, 118, 122, 127, 132, 137, 142, 148, 153, 159 );
 
 type K32x10b_ARRAY is array(0 to 31) of int10b;
 type K16x10b_ARRAY is array(0 to 15) of int10b;
@@ -103,6 +109,9 @@ constant TabK1_default  : K32x10b_ARRAY := (
 constant TabK1_5200  : K32x10b_ARRAY := (
  -501, -498, -495, -490, -485, -478, -469, -459, -446, -431, -412, -389, -362, -331, -295, -253,
  -207, -156, -102,  -45,   13,   70,  126,  179,  228,  272,  311,  345,  374,  399,  420,  437 );
+constant TabK1_5220  : K32x10b_ARRAY := (
+ -501, -498, -497, -495, -493, -491, -488, -482, -478, -474, -469, -464, -459, -452, -445, -437,
+ -412, -380, -339, -288, -227, -158,  -81,   -1,	80,  157,  226,  287,  337,  379,  411,  436 );
   
 constant TabK2_default  : K32x10b_ARRAY := (
  -349, -328, -305, -280, -252, -223, -192, -158, -124,  -88,  -51,  -14,  23,    60,   97,  133,
@@ -110,46 +119,65 @@ constant TabK2_default  : K32x10b_ARRAY := (
 constant TabK2_5200  : K32x10b_ARRAY := (
  -376, -357, -335, -312, -286, -258, -227, -195, -161, -124,  -87,  -49,  -10,   29,   68,  106,
   143,  178,  212,  243,  272,  299,  324,  346,  366,  384,  400,  414,  427,  438,  448,  506 );
+constant TabK2_5220  : K32x10b_ARRAY := (
+ -328, -303, -274, -244, -211, -175, -138,  -99,  -59,  -18,   24,   64,  105,  143,  180,  215,
+  248,  278,  306,  331,  354,  374,  392,  408,  422,  435,  445,  455,  463,  470,  476,  506 );
 
 constant TabK3_default  : K16x10b_ARRAY := (
  -397, -365, -327, -282, -229, -170, -104, -36,  35,  104,  169,  228,  281,  326, 364, 396 );
 constant TabK3_5200  : K16x10b_ARRAY := (
  -407, -381, -349, -311, -268, -218, -162,-102, -39,   25,   89,  149,  206,  257, 302, 341 );
+constant TabK3_5220  : K16x10b_ARRAY := (
+ -441, -387, -333, -279, -225, -171, -117,  -63, -9,   45,   98,  152,  206,  260, 314, 368 );
 
 constant TabK4_default  : K16x10b_ARRAY := (
  -373, -334, -293, -245, -191, -131,  -67,  -1,  64,  128,  188,  243,  291,  332, 367, 397 );
 constant TabK4_5200  : K16x10b_ARRAY := (
- -290, -252, -209, -163, -114,  -62,   -9,   44, 97,  147,  194,  238,  278,  313, 344, 371 );
+ -290, -252, -209, -163, -114,  -62,   -9,  44,  97,  147,  194,  238,  278,  313, 344, 371 );
+constant TabK4_5220  : K16x10b_ARRAY := (
+ -328, -273, -217, -161, -106,  -50,    5,  61, 116,  172,  228,  283,  339,  394, 450, 506 );
 
 constant TabK5_default  : K16x10b_ARRAY := (
  -319, -286, -250, -211, -168, -122,  -74, -25,  24,   73,  121,  167,  210,  249, 285, 319 );
 constant TabK5_5200  : K16x10b_ARRAY := (
  -318, -283, -245, -202, -156, -107,  -56,  -3,  49,  101,  150,  196,  239,  278, 313, 344 );
+constant TabK5_5220  : K16x10b_ARRAY := (
+ -328, -282, -235, -189, -142,  -96,  -50,  -3,  43,   90,  136,  182,  229,  275, 322, 368 );
 
 constant TabK6_default  : K16x10b_ARRAY := (
  -290, -252, -209, -163, -114,  -62,   -9,  44,  97,  147,  194,  239,  278,  313, 344, 371 );
 constant TabK6_5200  : K16x10b_ARRAY := (
  -193, -152, -109,  -65,  -20,   26,   71, 115, 158,  198,  235,  270,  301,  330, 355, 377 );
+constant TabK6_5220  : K16x10b_ARRAY := (
+ -256, -212, -168, -123,  -79,  -35,   10,  54,  98,  143,  187,  232,  276,  320, 365, 409 );
 
 constant TabK7_default  : K16x10b_ARRAY := (
  -291, -256, -216, -174, -128,  -80, -31,  19,  69,  117,  163,  206,  246,  283, 316, 345 );
 constant TabK7_5200  : K16x10b_ARRAY := (
  -254, -218, -180, -140,  -97,  -53,  -8,  36,  81,  124,  165,  204,  240,  274, 304, 332 );
+constant TabK7_5220  : K16x10b_ARRAY := (
+ -308, -260, -212, -164, -117,  -69, -21,  27,  75,  122,  170,  218,  266,  314, 361, 409 );
 
 constant TabK8_default  : K8x10b_ARRAY  := (
  -219, -133,  -38,   59,  152,  235,  305, 361 );
 constant TabK8_5200  : K8x10b_ARRAY  := (
  -205, -112,  -10,   92,  187,  269,  336, 387 );
+constant TabK8_5220  : K8x10b_ARRAY  := (
+ -256, -161,  -66,   29,  124,  219,  314, 409 );
 
 constant TabK9_default  : K8x10b_ARRAY  := (
  -225, -157,  -82,   -3,   76,  151,  220, 280 );
 constant TabK9_5200  : K8x10b_ARRAY  := (
  -249, -183, -110,  -32,   48,  126,  198, 261 );
+constant TabK9_5220  : K8x10b_ARRAY  := (
+ -256, -176,  -96,  -15,   65,  146,  226, 307 );
 
 constant TabK10_default : K8x10b_ARRAY  := (
  -179, -122,  -61,    1,   63,  123,  179, 231 );
 constant TabK10_5200 : K8x10b_ARRAY  := (
  -190, -133,  -73,  -10,   53,  115,  173, 227 );
+constant TabK10_5220 : K8x10b_ARRAY  := (
+ -205, -132,  -59,   14,   87,  160,  234, 307 );
 
 signal ET   : int10b := 0;
 signal PT   : int10b := 0;
@@ -218,19 +246,19 @@ signal TabK10 : K8x10b_ARRAY;
 
 begin
 
-TabChirp <= TabChirp_default when is_5200_g = 0 else TabChirp_5200;
-TabEnergy <=  TabEnergy_default when is_5200_g = 0 else TabEnergy_5200;
-TabPitch <= TabPitch_default when is_5200_g = 0 else TabPitch_5200;
-TabK1  <= TabK1_default when is_5200_g = 0 else TabK1_5200;
-TabK2  <= TabK2_default when is_5200_g = 0 else TabK2_5200;
-TabK3  <= TabK3_default when is_5200_g = 0 else TabK3_5200;
-TabK4  <= TabK4_default when is_5200_g = 0 else TabK4_5200;
-TabK5  <= TabK5_default when is_5200_g = 0 else TabK5_5200;
-TabK6  <= TabK6_default when is_5200_g = 0 else TabK6_5200;
-TabK7  <= TabK7_default when is_5200_g = 0 else TabK7_5200;
-TabK8  <= TabK8_default when is_5200_g = 0 else TabK8_5200;
-TabK9  <= TabK9_default when is_5200_g = 0 else TabK9_5200;
-TabK10 <= TabK10_default when is_5200_g = 0 else TabK10_5200;
+TabChirp <= TabChirp_default when Model = "00" else TabChirp_5200;
+TabEnergy <=  TabEnergy_default when Model = "00" else TabEnergy_5200;
+TabPitch <= TabPitch_default when Model = "00" else TabPitch_5200 when Model = "01" else TabPitch_5220;
+TabK1  <= TabK1_default when Model = "00" else TabK1_5200 when Model = "01" else TabK1_5220;
+TabK2  <= TabK2_default when Model = "00" else TabK2_5200 when Model = "01" else TabK2_5220;
+TabK3  <= TabK3_default when Model = "00" else TabK3_5200 when Model = "01" else TabK3_5220;
+TabK4  <= TabK4_default when Model = "00" else TabK4_5200 when Model = "01" else TabK4_5220;
+TabK5  <= TabK5_default when Model = "00" else TabK5_5200 when Model = "01" else TabK5_5220;
+TabK6  <= TabK6_default when Model = "00" else TabK6_5200 when Model = "01" else TabK6_5220;
+TabK7  <= TabK7_default when Model = "00" else TabK7_5200 when Model = "01" else TabK7_5220;
+TabK8  <= TabK8_default when Model = "00" else TabK8_5200 when Model = "01" else TabK8_5220;
+TabK9  <= TabK9_default when Model = "00" else TabK9_5200 when Model = "01" else TabK9_5220;
+TabK10 <= TabK10_default when Model= "00" else TabK10_5200 when Model= "01" else TabK10_5220;
 
 --E_Out      <= EC;
 --P_Out      <= PC;
@@ -254,14 +282,10 @@ NoK5K10   <= '1' when (CodePitch  ="000000") else '0';
 
 GetRepeat <= '1' when ((CntSample = "00000000") and (Cnt_8k >= "000100") and  (Cnt_8k < "000101")) and ((Silence = '0') and (LastFrame = '0')) else '0';
 --GetPitch  <= '1' when ((CntSample = "00000000") and (Cnt_8k >= "000101") and  (Cnt_8k < "001010")) and ((Silence = '0') and (LastFrame = '0')) else '0';
---GetK1K4   <= '1' when ((CntSample = "00000000") and (Cnt_8k >= "001011") and  (Cnt_8k < "011101")) and ((Silence = '0') and (LastFrame = '0')  and (CodeRepeat = '0'))  else '0';
---GetK5K10  <= '1' when ((CntSample = "00000000") and (Cnt_8k >= "011110") and  (Cnt_8k < "110011")) and ((Silence = '0') and (LastFrame = '0')  and (CodeRepeat = '0') and (NoK5K10 = '0')) else '0';
-GetPitch  <= '1' when ((((is_5200_g /= 1) and (CntSample = "00000000") and (Cnt_8k >= "000101") and  (Cnt_8k < "001010"))
-                     or ((is_5200_g  = 1) and (CntSample = "00000000") and (Cnt_8k >= "000101") and  (Cnt_8k < "001011"))) and ((Silence = '0') and (LastFrame = '0'))) else '0';
-GetK1K4   <= '1' when ((((is_5200_g /= 1) and (CntSample = "00000000") and (Cnt_8k >= "001011") and  (Cnt_8k < "011101"))
-                     or ((is_5200_g  = 1) and (CntSample = "00000000") and (Cnt_8k >= "001100") and  (Cnt_8k < "011110"))) and ((Silence = '0') and (LastFrame = '0')  and (CodeRepeat = '0')))  else '0';
-GetK5K10  <= '1' when ((((is_5200_g /= 1) and (CntSample = "00000000") and (Cnt_8k >= "011110") and  (Cnt_8k < "110011"))
-                     or ((is_5200_g  = 1) and (CntSample = "00000000") and (Cnt_8k >= "011111") and  (Cnt_8k < "110100"))) and ((Silence = '0') and (LastFrame = '0')  and (CodeRepeat = '0') and (NoK5K10 = '0'))) else '0';
+GetPitch  <= '1' when ((((Model  = "00") and (CntSample = "00000000") and (Cnt_8k >= "000101") and  (Cnt_8k < "001010"))
+                     or ((Model /= "00") and (CntSample = "00000000") and (Cnt_8k >= "000101") and  (Cnt_8k < "001011"))) and ((Silence = '0') and (LastFrame = '0'))) else '0';
+GetK1K4   <= '1' when ((CntSample = "00000000") and (Cnt_8k >= "001011") and  (Cnt_8k < "011101")) and ((Silence = '0') and (LastFrame = '0')  and (CodeRepeat = '0'))  else '0';
+GetK5K10  <= '1' when ((CntSample = "00000000") and (Cnt_8k >= "011110") and  (Cnt_8k < "110011")) and ((Silence = '0') and (LastFrame = '0')  and (CodeRepeat = '0') and (NoK5K10 = '0')) else '0';
 
 ReadRom   <= '1' when  (GetEnergy = '1') or (GetRepeat = '1') or(GetPitch = '1') or (GetK1K4 = '1') or (GetK5K10 = '1') else '0';
 
@@ -330,8 +354,8 @@ begin
       if (GetEnergy = '1')  then  CodeEnergy <= CodeEnergy(2 downto 0) & RomData; end if;
       if (GetRepeat = '1')  then  CodeRepeat <= RomData;                          end if;
 --      if (GetPitch  = '1')  then  CodePitch  <= CodePitch(3 downto 0)  & RomData; end if;
-      if (GetPitch  = '1' and (is_5200_g /= 1))  then  CodePitch  <= '0' & CodePitch(3 downto 0)  & RomData; end if;
-      if (GetPitch  = '1' and (is_5200_g  = 1))  then  CodePitch  <= CodePitch(4 downto 0)  & RomData; end if;
+      if (GetPitch  = '1' and (Model  = "00"))  then  CodePitch  <= '0' & CodePitch(3 downto 0)  & RomData; end if;
+      if (GetPitch  = '1' and (Model /= "00"))  then  CodePitch  <= CodePitch(4 downto 0)  & RomData; end if;
       if (GetK1K4   = '1')  then  CodeK1K4   <= CodeK1K4(16 downto 0)  & RomData; end if;
       if (GetK5K10  = '1')  then  CodeK5K10  <= CodeK5K10(19 downto 0) & RomData; end if;
 

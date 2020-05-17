@@ -29,6 +29,7 @@ use work.tms6100;
 entity tispeechsyn is
 	port
 	(
+		model     : in STD_LOGIC_VECTOR (1 downto 0);
 		reset_n_i : in STD_LOGIC;
 		clk_i     : in STD_LOGIC;
 		addr_i    : in STD_LOGIC_VECTOR (15 downto 0);
@@ -66,6 +67,7 @@ begin
   -----------------------------------------------------------------------------
   tms5220_b : tms5220
     port map (
+		model     => model,
 		reset     => not reset_n_i,
 		clk_i     => clk_i,
 		ce_n_i    => '0',--not clk_i,
