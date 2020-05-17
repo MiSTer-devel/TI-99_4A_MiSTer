@@ -2,7 +2,7 @@
 See below for original readme
 
 - Use the create-misterrom.cmd file to create the full bin file.
-- Requires 994aROM.BIN and 994AGROM.BIN files (speech ROMs are optional [speech not currently working]).
+- Requires 994aROM.BIN and 994AGROM.BIN files (speech ROMs are optional [speech working - use 5200 model in OSD]).
 - Load this as Full.bin
 - When loading carts, load C/G files before loading D files.
 
