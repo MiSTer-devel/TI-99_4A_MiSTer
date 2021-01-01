@@ -1,4 +1,4 @@
-#TI-99/4A Core for MiSTer
+# [TI-99/4A](https://en.wikipedia.org/wiki/Texas_Instruments_TI-99/4A) Core for MiSTer Platform
 See below for original readme
 
 - Use the create-misterrom.cmd file to create the full bin file.
@@ -7,7 +7,7 @@ See below for original readme
 - When loading carts, load C/G files before loading D files.
 
 
-# EP994A
+## EP994A
 My TI-99/4A clone implemented with a TMS99105 CPU and FPGA (master branch).
 Another version of the clone (the latest development in soft-cpu branch) includes my own
 TMS9900 CPU core written in VHDL.
