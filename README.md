@@ -1,7 +1,7 @@
 # [TI-99/4A](https://en.wikipedia.org/wiki/Texas_Instruments_TI-99/4A) Core for MiSTer Platform
 See below for original readme
 
-- Use the create-misterrom.cmd file to create the full bin file.
+- Use either the create-misterrom.cmd file included here or the [pyTIrom](https://github.com/GHPS/pyTIrom) utility to create the full bin file.
 - Requires 994aROM.BIN and 994AGROM.BIN files (speech ROMs are optional [speech working - use 5200 model in OSD]).
 - Load this as Full.bin
 - When loading carts, load C/G files before loading D files.
