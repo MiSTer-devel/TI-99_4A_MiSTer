@@ -221,6 +221,11 @@ end process;
 					loadbit <= '0' & loadbit(7 downto 1);
 				end if;
 			end if;
+			if (fifo_len >= 16) then
+				ready_n_o <= '1';
+			else
+				ready_n_o <= '0';
+			end if;
 			if ((rs_n_i = '1') and (last_rs_n = '0')) then --rising edge?
 				readbyte <= '0';
 			elsif ((ws_n_i = '1') and (last_ws_n = '0')) then --rising edge?
@@ -253,9 +258,6 @@ end process;
 						fifo(to_integer(unsigned(in_fifo))) <= data_i;
 						in_fifo <= std_logic_vector(unsigned(in_fifo) + to_unsigned(1, in_fifo'length));
 						inc1 := True;
-						ready_n_o <= '0';
-					else
-						ready_n_o <= '1';
 					end if;
 				end if;
 			end if;

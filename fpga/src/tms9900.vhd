@@ -45,7 +45,7 @@ entity tms9900 is
 	data_out : out  STD_LOGIC_VECTOR (15 downto 0);
 	rd 		: out  STD_LOGIC;		-- workin read with Pepino 40ns
 	wr 		: out  STD_LOGIC;		-- working write with Pepino 60ns
-	ready 	: in  STD_LOGIC;		-- NOT USED: memory read input, a high terminates a memory cycle 
+	ready 	: in  STD_LOGIC;		-- Currently connected to speech ready; NOT USED: memory read input, a high terminates a memory cycle 
 	iaq 		: out  STD_LOGIC;
 	as 		: out  STD_LOGIC;		-- address strobe, when high new address is valid, starts a memory cycle
 --	test_out : out STD_LOGIC_VECTOR (15 downto 0);
@@ -448,15 +448,15 @@ begin
 						end if;
 					when do_read2 => cpu_state <= do_read3;
 					when do_read3 => 
-						if (addr(15 downto 10) /= "100000") and -- "100000" = 8000-83FF
-							 (addr(15 downto 13) /= "000") then  -- "000"    = 0000-1FFF 
-							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(4*cycle_clks_g, 16));
-						end if;
-						-- if ready='1' then 
+						if ready='1' then 
+							if (addr(15 downto 10) /= "100000") and -- "100000" = 8000-83FF
+								(addr(15 downto 13) /= "000") then  -- "000"    = 0000-1FFF 
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(4*cycle_clks_g, 16));
+							end if;
 							cpu_state <= cpu_state_next;
 							rd <= '0';
 							rd_dat <= data_in;
-						-- end if;
+						end if;
 					when do_read_pad =>
 						cpu_state <= do_read_pad1;
 					when do_read_pad1 =>
@@ -515,10 +515,10 @@ begin
 						end if;
 						scratchpad_wr <= '0';
 						scratchpad_en <= '0';
-						-- if ready='1' then
+						if ready='1' then
 							cpu_state <= cpu_state_next; -- do_write4; -- cpu_state_next;
 							wr <= '0';
-						-- end if;
+						end if;
 					----------------
 					-- operations --
 					----------------

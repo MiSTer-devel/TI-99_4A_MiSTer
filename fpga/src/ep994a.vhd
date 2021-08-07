@@ -242,6 +242,7 @@ architecture Behavioral of ep994a is
    signal speech_o       : signed(7 downto 0);
 	signal speech_conv    : unsigned(10 downto 0);
 	signal speech_i       : std_logic;
+	signal speech_ready   : std_logic;
 	
 	-- SAMS memory extension
 	signal sams_regs			: std_logic_vector(7 downto 0) := x"00";
@@ -467,6 +468,7 @@ begin
 	conl_reset <= cpu_reset_ctrl(0) and real_reset;
 	
 	cpu_access <= not cpu_holda;	-- CPU owns the bus except when in hold
+	cpu_ready <= '1';
 	
 	-------------------------------------
 	-- vdp interrupt
@@ -1118,7 +1120,7 @@ begin
           data_out => data_from_cpu,
           rd => cpu_rd,
           wr => cpu_wr,
-          ready => cpu_ready,
+          ready => (speech_ready or not speech_i) and cpu_ready,
           iaq => cpu_iaq,
           as => cpu_as,
 --			 test_out => test_out,
@@ -1150,7 +1152,7 @@ begin
           data_i => data_from_cpu(15 downto 8),
 			 MEM_n_i => MEM_n,
 			 dbin_i => cpu_rd,
-			 ready_o => open, --could use this
+			 ready_o => speech_ready,
 			 aout_o => speech_o,
 			 sr_re_o => sr_re_o,
 			 sr_addr_o => sr_addr_o,
