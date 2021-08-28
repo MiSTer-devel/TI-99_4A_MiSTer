@@ -1,11 +1,20 @@
 # [TI-99/4A](https://en.wikipedia.org/wiki/Texas_Instruments_TI-99/4A) Core for MiSTer Platform
 See below for original readme
 
+- Requires SDRAM Module.  Anything over 2Megs should work.
 - Use either the create-misterrom.cmd file included here or the [pyTIrom](https://github.com/GHPS/pyTIrom) utility to create the full bin file.
-- Requires 994aROM.BIN and 994AGROM.BIN files (speech ROMs are optional [speech working - use 5200 model in OSD]).
-- Load this as Full.bin
+- Requires 994aROM.BIN and 994AGROM.BIN for base functionality.
+- The Disk DSR and Speech ROMs are optional [speech working - use 5200 model in OSD] but required if you plan on using the features.
+- Load this as Full.bin or renamed it to boot.rom to autostart with that rom.
+- Supports cartridges up to 512K
 - When loading carts, load C/G files before loading D files.
-
+- C rom files larger than 64K must be loaded with the Load Mega Cart option.
+- Support for MBX, Paged7, Paged378 (UberGrom), Paged379 and MiniMem Cartridges.
+- MiniMem utilizes 4K NVRAM file.  Use the MiniMem OSD sub menu to Select the NVRAM file then Load/Save to use it. A Blank 4k NVRAM.dat file is in the Releases folder.
+- Single and Double Sided Floppies are supported (Single Density only).
+- NTSC/PAL Video Modes are supported.
+- SAMS memory (512K), can be disabled via OSD.
+- Turbo may work with some Cartridges and TI Basic.  DOES NOT work with Extended Basic (XB).  YMMV
 
 ## EP994A
 My TI-99/4A clone implemented with a TMS99105 CPU and FPGA (master branch).

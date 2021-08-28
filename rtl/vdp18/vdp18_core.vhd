@@ -77,7 +77,7 @@ use work.vdp18_pack.all;
 entity vdp18_core is
 
   generic (
-    is_pal_g      : integer := 0;
+--    is_pal_g      : integer := 0;
     compat_rgb_g  : integer := 0
   );
   port (
@@ -107,7 +107,8 @@ entity vdp18_core is
     blank_n_o     : out std_logic;
     hblank_o      : out std_logic;
     vblank_o      : out std_logic;
-    comp_sync_n_o : out std_logic
+    comp_sync_n_o : out std_logic;
+	is_pal_g		: in boolean
   );
 
 end vdp18_core;
@@ -202,9 +203,9 @@ begin
   -- Horizontal and Vertical Timing Generator
   -----------------------------------------------------------------------------
   hor_vert_b : work.vdp18_hor_vert
-    generic map (
-      is_pal_g => is_pal_g
-    )
+--    generic map (
+----      is_pal_g => is_pal_g
+--    )
     port map (
       clk_i         => clk_i,
       clk_en_5m37_i => clk_en_5m37_s,
@@ -217,7 +218,8 @@ begin
       vsync_n_o     => vsync_n_s,
       blank_o       => blank_s,
       hblank_o      => hblank_s,
-      vblank_o      => vblank_s
+      vblank_o      => vblank_s,
+      is_pal_g      => is_pal_g
     );
 
   hsync_n_o     <= hsync_n_s;

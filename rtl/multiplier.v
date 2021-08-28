@@ -22,7 +22,7 @@ module multiplier (
 
   always @(posedge clk) begin
     if ((old_a != a) || (old_b != b)) begin
-	  bindex <= 1 << 1;
+	  bindex <= 19'h00001 << 1;
 	  product <= {18'h00000, b[0] ? a : 18'h00000};
 	  old_a <= a;
 	  old_b <= b;

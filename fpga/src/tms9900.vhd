@@ -45,7 +45,7 @@ entity tms9900 is
 	data_out : out  STD_LOGIC_VECTOR (15 downto 0);
 	rd 		: out  STD_LOGIC;		-- workin read with Pepino 40ns
 	wr 		: out  STD_LOGIC;		-- working write with Pepino 60ns
-	ready 	: in  STD_LOGIC;		-- Currently connected to speech ready; NOT USED: memory read input, a high terminates a memory cycle 
+	ready 	: in  STD_LOGIC := '1';	-- Currently connected to speech ready; 
 	iaq 		: out  STD_LOGIC;
 	as 		: out  STD_LOGIC;		-- address strobe, when high new address is valid, starts a memory cycle
 --	test_out : out STD_LOGIC_VECTOR (15 downto 0);
@@ -194,7 +194,7 @@ architecture Behavioral of tms9900 is
 	end component;	
 	
 	signal scratchpad_wr  : std_logic;
-	signal scratchpad_en  : std_logic;
+--	signal scratchpad_en  : std_logic;
 	signal scratchpad_out : STD_LOGIC_VECTOR (15 downto 0);
 	
 	procedure do_pc_read_quick(
@@ -203,8 +203,8 @@ architecture Behavioral of tms9900 is
 		signal cpu_state : out cpu_state_type;
 		signal as : out std_logic;
 		signal rd : out std_logic;
-		signal scratchpad_wr : out std_logic;
-		signal scratchpad_en : out std_logic
+		signal scratchpad_wr : out std_logic
+--		signal scratchpad_en : out std_logic
 	) is
 	begin
 		-- pc is only top 15 bits
@@ -213,7 +213,7 @@ architecture Behavioral of tms9900 is
 		if pc(15 downto 8) = x"83" and scratch_en='1' then
 			-- scratchpad support begin
 			scratchpad_wr <= '0';
-			scratchpad_en <= '1';
+--			scratchpad_en <= '1';
 			cpu_state <= do_read_pad;
 		else 
 			as <= '1';
@@ -360,7 +360,7 @@ begin
 		end if;
 	end process;
 
-	process(clk, reset) is
+	process(clk, reset, hold) is
 	variable offset : std_logic_vector(15 downto 0);
 	variable take_branch : boolean;
 	variable dec_shift_count   : boolean := False;
@@ -386,7 +386,7 @@ begin
 			capture_ir <= True;
 			set_int_priority <= False;
 			int_ack <= '0';
-			scratchpad_en <= '0';
+--			scratchpad_en <= '0';
 			scratchpad_wr <= '0';
 			delay_ir_count <= x"0000";
 			delay_ir_wait <= x"0000";
@@ -408,7 +408,7 @@ begin
 						if pc(15 downto 8) = x"83" and scratch_en='1' then
 							-- scratchpad support begin
 							scratchpad_wr <= '0';
-							scratchpad_en <= '1';
+--							scratchpad_en <= '1';
 							cpu_state <= do_read_pad;
 						else 
 							as <= '1';
@@ -420,7 +420,7 @@ begin
 						if ea(15 downto 8) = x"83" and scratch_en='1' then
 							-- scratchpad support begin
 							scratchpad_wr <= '0';
-							scratchpad_en <= '1';
+--							scratchpad_en <= '1';
 							cpu_state <= do_read_pad;
 						else 
 							as <= '1';
@@ -431,7 +431,7 @@ begin
 						addr <= alu_result;
 						if alu_result(15 downto 8) = x"83" and scratch_en='1' then
 							scratchpad_wr <= '0';
-							scratchpad_en <= '1';
+--							scratchpad_en <= '1';
 							cpu_state <= do_read_pad;
 						else
 							as <= '1';
@@ -450,7 +450,7 @@ begin
 					when do_read3 => 
 						if ready='1' then 
 							if (addr(15 downto 10) /= "100000") and -- "100000" = 8000-83FF
-								(addr(15 downto 13) /= "000") then  -- "000"    = 0000-1FFF 
+							   (addr(15 downto 13) /= "000") then  -- "000"    = 0000-1FFF 
 								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(4*cycle_clks_g, 16));
 							end if;
 							cpu_state <= cpu_state_next;
@@ -461,7 +461,7 @@ begin
 						cpu_state <= do_read_pad1;
 					when do_read_pad1 =>
 						-- read from scratchpad
-						scratchpad_en <= '0';					
+--						scratchpad_en <= '0';					
 						cpu_state <= cpu_state_next; -- do_read4; -- cpu_state_next;
 						data_out <= scratchpad_out;	-- for debugging show what was read
 						rd_dat <= scratchpad_out;
@@ -472,7 +472,7 @@ begin
 						data_out <= wr_dat;
 						if ea(15 downto 8) = x"83" and scratch_en='1' then
 							scratchpad_wr <= '1';
-							scratchpad_en <= '1';
+--							scratchpad_en <= '1';
 							cpu_state <= do_write3;
 						else
 							as <= '1';
@@ -485,7 +485,7 @@ begin
 						data_out <= wr_dat;
 						if alu_result(15 downto 8) = x"83" and scratch_en='1' then
 							scratchpad_wr <= '1';
-							scratchpad_en <= '1';
+--							scratchpad_en <= '1';
 							cpu_state <= do_write3;
 						else
 							-- external memory
@@ -509,15 +509,17 @@ begin
 						end if;
 					when do_write2 => cpu_state <= do_write3;
 					when do_write3 => 
-						if (addr(15 downto 10) /= "100000") and -- "100000" = 8000-83FF
-							 (addr(15 downto 13) /= "000") then  -- "000"    = 0000-1FFF 
-							delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(4*cycle_clks_g, 16));
-						end if;
-						scratchpad_wr <= '0';
-						scratchpad_en <= '0';
 						if ready='1' then
+							if (addr(15 downto 10) /= "100000") and -- "100000" = 8000-83FF
+							   (addr(15 downto 13) /= "000") then  -- "000"    = 0000-1FFF 
+								delay_ir_wait <= std_logic_vector(unsigned(delay_ir_wait) + to_unsigned(4*cycle_clks_g, 16));
+							end if;
+							scratchpad_wr <= '0';
+--							scratchpad_en <= '0';
 							cpu_state <= cpu_state_next; -- do_write4; -- cpu_state_next;
 							wr <= '0';
+						else
+							inc_ir_count := False;
 						end if;
 					----------------
 					-- operations --
@@ -546,7 +548,8 @@ begin
 								-- instead of going to do_pc_read let's inline that stuff here.
 								-- LEGACY code:
 								-- -- cpu_state <= do_pc_read;
-								do_pc_read_quick(pc=>pc, addr=>addr, cpu_state=>cpu_state, as=>as, rd=>rd, scratchpad_wr=>scratchpad_wr, scratchpad_en=>scratchpad_en);
+--								do_pc_read_quick(pc=>pc, addr=>addr, cpu_state=>cpu_state, as=>as, rd=>rd, scratchpad_wr=>scratchpad_wr, scratchpad_en=>scratchpad_en);
+								do_pc_read_quick(pc=>pc, addr=>addr, cpu_state=>cpu_state, as=>as, rd=>rd, scratchpad_wr=>scratchpad_wr);
 								cpu_state_next <= do_decode;
 --								addr <= pc;
 --								pc <= std_logic_vector(unsigned(pc) + to_unsigned(2,16));
