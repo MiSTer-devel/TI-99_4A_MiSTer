@@ -26,6 +26,7 @@
 // v2.1 - Add universal 8/16 bit mode.
 // v2.2 - Support for SDRAM v2
 //
+// Flandango - Adjusted timings for 43MHZ clock
 
 module sdram
 (
@@ -73,8 +74,10 @@ localparam OP_MODE             = 2'b00;    // only 00 (standard operation) allow
 localparam NO_WRITE_BURST      = 1'b1;     // 0= write burst enabled, 1=only single access write
 localparam MODE                = {3'b000, NO_WRITE_BURST, OP_MODE, CAS_LATENCY, ACCESS_TYPE, BURST_LENGTH};
 
-localparam sdram_startup_cycles= 14'd12100;// 100us, plus a little more, @ 100MHz
-localparam cycles_per_refresh  = 14'd780;  // (64000*100)/8192-1 Calc'd as (64ms @ 100MHz)/8192 rose
+//localparam sdram_startup_cycles= 14'd12100;// 100us, plus a little more, @ 100MHz
+localparam sdram_startup_cycles= 14'd5000;// 100us, plus a little more, @ 43MHz
+//localparam cycles_per_refresh  = 14'd780;  // (64000*100)/8192-1 Calc'd as (64ms @ 100MHz)/8192 rose
+localparam cycles_per_refresh  = 14'd335;  // (64000*43)/8192-1 Calc'd as (64ms @ 100MHz)/8192 rose
 localparam startup_refresh_max = 14'b11111111111111;
 
 // SDRAM commands

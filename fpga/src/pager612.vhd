@@ -29,8 +29,8 @@ entity pager612 is
            dbus_in 		: in  STD_LOGIC_VECTOR (15 downto 0);
            dbus_out 		: out  STD_LOGIC_VECTOR (15 downto 0);
            mapen 			: in  STD_LOGIC;	-- 1 = enable mapping
-           write_enable : in  STD_LOGIC;		-- 0 = write to register when sel_regs = 1
-           page_reg_read : in  STD_LOGIC;		-- 0 = read from register when sel_regs = 1
+           write_enable : in  STD_LOGIC;		-- 0 = write to register when access_regs = 1
+           page_reg_read : in  STD_LOGIC;		-- 0 = read from register when access_regs = 1
            translated_addr : out  STD_LOGIC_VECTOR (15 downto 0);
            access_regs  : in  STD_LOGIC -- 1 = read/write registers
 			  );

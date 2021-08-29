@@ -22,6 +22,8 @@ set_global_assignment -name VHDL_FILE rtl/vdp18/vdp18_core.vhd
 set_global_assignment -name VERILOG_FILE "rtl/multiplier.v"
 set_global_assignment -name VHDL_FILE rtl/cv_clock.vhd
 set_global_assignment -name VHDL_FILE rtl/cv_por.vhd
+set_global_assignment -name VERILOG_FILE "rtl/fdc1772/fdc1772.v"
+set_global_assignment -name VERILOG_FILE "rtl/fdc1772/floppy.v"
 set_global_assignment -name VHDL_FILE "fpga/src/ep994a.vhd"
 set_global_assignment -name VHDL_FILE "fpga/src/gromext.vhd"
 set_global_assignment -name VHDL_FILE "fpga/src/pager612.vhd"

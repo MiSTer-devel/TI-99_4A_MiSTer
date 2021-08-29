@@ -39,7 +39,7 @@ BEGIN
 		clock_enable_output_a => "BYPASS",
 		clock_enable_input_b => "BYPASS",
 		clock_enable_output_b => "BYPASS",
-		intended_device_family => "Cyclone III",
+		intended_device_family => "Cyclone V",
 		lpm_hint => "ENABLE_RUNTIME_MOD=NO",
 		lpm_type => "altsyncram",
 		numwords_a => 2**widthad,

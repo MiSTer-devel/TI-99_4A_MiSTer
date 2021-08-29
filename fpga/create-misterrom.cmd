@@ -19,6 +19,10 @@ if not exist ..\firmware\994aROM.Bin (
 echo "Missing ..\firmware\994aROM.Bin file"
 exit
 )
+if not exist ..\firmware\Disk.Bin (
+echo "Missing ..\firmware\Disk.Bin file"
+exit
+)
 if not exist ..\firmware\SPCHROM.BIN (
 echo "Missing ..\firmware\SPCHROM.BIN file. Skipping"
 )
@@ -33,10 +37,13 @@ REM -- 3) Then 64K are written to B0000 i.e. our DSR ROM and ROM area. 994aROM.B
 REM -- 4) Last 64K are written to Expansion RAM
 REM -- 5) 32K SpeechRom is appended at end...not directly accessible from CPU
 
-REM  |--- 64K module ROM section   ---|   |--- 64K GROM section                              ---|   |--- here is 64K ROM section                                        ---|   |--- Expansion RAM ---|   |--- Speech past end  ---|
-REM  |   Repeat C and D to cover      |   |     24K                        40K available        |   |                                                                      |   |                     |   |                        |
-REM  |   C.bin       D.bin     (Avail)|   |     System GRom                Cart GRom (Fix Size) |   | DSR                    System Rom must be at 40K                     |   |                     |   |                        | Out File
-copy /B hole8k + /B hole8k + /B hole48k + /B ..\firmware\994AGROM.Bin + /B hole8k + /B hole32k + /B hole8k + /B hole32k + /B ..\firmware\994aROM.Bin + /B hole8k + /B hole8k + /B hole32k + /B hole32k + /B ..\firmware\SPCHROM.BIN tiroms.bin
+REM  |--- 64K module ROM section   ---|   |--- 64K GROM section                              ---|   |--- here is 64K ROM section                                                      ---|   |--- Expansion RAM ---|   |--- Speech past end  ---|
+REM  |   Repeat C and D to cover      |   |     24K                        40K available        |   |                                                                                    |   |                     |   |                        |
+REM  |   C.bin       D.bin     (Avail)|   |     System GRom                Cart GRom (Fix Size) |   | DSR                    System Rom must be at 40K                                   |   |                     |   |                        | Out File
+copy /B hole8k + /B hole8k + /B hole48k + /B ..\firmware\994AGROM.Bin + /B hole8k + /B hole32k + /B ..\firmware\Disk.bin + /B hole32k + /B ..\firmware\994aROM.Bin + /B hole8k + /B hole8k + /B hole32k + /B hole32k + /B ..\firmware\SPCHROM.BIN full.bin
+
+REM Below is original system rom without Disk DSR
+REM  copy /B hole8k + /B hole8k + /B hole48k + /B ..\firmware\994AGROM.Bin + /B hole8k + /B hole32k + /B hole8k + /B hole32k + /B ..\firmware\994aROM.Bin + /B hole8k + /B hole8k + /B hole32k + /B hole32k + /B ..\firmware\SPCHROM.BIN tiroms.bin
 
 
 

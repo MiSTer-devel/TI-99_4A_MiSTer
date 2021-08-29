@@ -53,9 +53,9 @@ use work.vdp18_pack.hv_t;
 
 entity vdp18_hor_vert is
 
-  generic (
-    is_pal_g      : integer := 0
-  );
+--  generic (
+----    is_pal_g      : integer := 0
+--  );
   port (
     clk_i         : in  std_logic;
     clk_en_5m37_i : in  boolean;
@@ -68,7 +68,8 @@ entity vdp18_hor_vert is
     vsync_n_o     : out std_logic;
     blank_o       : out boolean;
     hblank_o      : out boolean;
-    vblank_o      : out boolean
+    vblank_o      : out boolean;
+	is_pal_g		: in boolean
   );
 
 end vdp18_hor_vert;
@@ -97,15 +98,15 @@ begin
   -----------------------------------------------------------------------------
   -- Prepare comparison signals for NTSC and PAL.
   --
-  is_ntsc: if is_pal_g /= 1 generate
-    first_line_s <= hv_first_line_ntsc_c;
-    last_line_s  <= hv_last_line_ntsc_c;
-  end generate;
-  --
-  is_pal: if is_pal_g = 1 generate
-    first_line_s <= hv_first_line_pal_c;
-    last_line_s  <= hv_last_line_pal_c;
-  end generate;
+--  is_ntsc: if is_pal_g = 0 generate
+--    first_line_s <= hv_first_line_ntsc_c;
+--    last_line_s  <= hv_last_line_ntsc_c;
+--  end generate;
+--  --
+--  is_pal: if is_pal_g = 1 generate
+--    first_line_s <= hv_first_line_pal_c;
+--    last_line_s  <= hv_last_line_pal_c;
+--  end generate;
   --
   -----------------------------------------------------------------------------
 
@@ -148,6 +149,13 @@ begin
       vblank_q   <= false;
 
     elsif clk_i'event and clk_i = '1' then
+		if is_pal_g then
+			first_line_s <= hv_first_line_pal_c;
+			last_line_s <= hv_last_line_pal_c;
+		else
+			first_line_s <= hv_first_line_ntsc_c;
+			last_line_s <= hv_last_line_ntsc_c;
+		end if;
       if clk_en_5m37_i then
         -- The horizontal counter ---------------------------------------------
         if cnt_hor_q = last_pix_s then
@@ -170,6 +178,7 @@ begin
         elsif cnt_hor_q = -38 then
           hsync_n_o <= '1';
         end if;
+		  -- Horizontal Blanking
         if    cnt_hor_q = -72 then
           hblank_q  <= true;
         elsif cnt_hor_q = -14 then
@@ -177,11 +186,16 @@ begin
         end if;
 
         -- Vertical sync ------------------------------------------------------
-        if is_pal_g = 1 then
+        if is_pal_g then
           if    cnt_vert_q = 244 then
             vsync_n_o <= '0';
           elsif cnt_vert_q = 247 then
             vsync_n_o <= '1';
+          end if;
+          if    cnt_vert_q = 208 then -- 215, then 241
+            vblank_q  <= true;
+          elsif cnt_vert_q = first_line_s + 47 then
+            vblank_q  <= false;
           end if;
         else
           if    cnt_vert_q = 218 then
@@ -190,9 +204,9 @@ begin
             vsync_n_o <= '1';
           end if;
 
-          if    cnt_vert_q = 215 then
+          if    cnt_vert_q = 208 then
             vblank_q  <= true;
-          elsif cnt_vert_q = first_line_s + 13 then
+          elsif cnt_vert_q = first_line_s + 22 then
             vblank_q  <= false;
           end if;
         end if;
