@@ -814,7 +814,7 @@ begin
 							mbx_rom_bank <= data_from_cpu(9 downto 8);
 						elsif cartridge_cs='1' and cpu_addr(14 downto 3)=x"E00" and cart_type_i = 2 then -- Paged7 bank switch (>7000 - 7006) 
 							mbx_rom_bank <= cpu_addr(2 downto 1);
-						elsif cartridge_cs='1' and cpu_addr(14 downto 7)=x"C0" and cart_type_i = 3 then -- Paged378 bank switch (>6000 - 607E) 
+						elsif cartridge_cs='1' and cpu_addr(15 downto 12)=x"6" and cart_type_i = 3 then -- Paged378 bank switch (>6000 - 607E) 
 							uber_rom_bank <= (cpu_addr(6 downto 1) and cart_8k_banks(5 downto 0));
 						elsif cartridge_cs='1' and cpu_addr(14 downto 7)=x"C0" and cart_type_i = 4 then -- Paged379 bank switch (>6000 - 607E) 
 							uber_rom_bank <= (others => '0');
