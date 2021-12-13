@@ -71,7 +71,7 @@ entity ep994a is
 		epGPIO_i		 : in std_logic_vector(7 downto 0);
 		epGPIO_o		 : out std_logic_vector(8 downto 0);
 		-- CPU RAM Interface ------------------------------------------------------
-		cpu_ram_a_o     : out std_logic_vector(20 downto 0);
+		cpu_ram_a_o     : out std_logic_vector(24 downto 0);
 		cpu_ram_ce_n_o  : out std_logic;
 		cpu_ram_we_n_o  : out std_logic;
 		cpu_ram_be_n_o  : out std_logic_vector( 1 downto 0);
@@ -94,20 +94,35 @@ entity ep994a is
 		vblank_o        : out std_logic;
 		comp_sync_n_o   : out std_logic;
 		-- Disk interface ---------------------------------------------------------
-		img_mounted     : in  std_logic_vector( 1 downto 0);
-		img_wp          : in  std_logic_vector( 1 downto 0);
+		img_mounted     : in  std_logic_vector( 2 downto 0);
+		img_wp          : in  std_logic_vector( 2 downto 0);
 		img_size        : in  std_logic_vector(31 downto 0); -- in bytes
 
 		sd_lba          : out std_logic_vector(31 downto 0);
-		sd_rd           : out std_logic_vector( 1 downto 0);
-		sd_wr           : out std_logic_vector( 1 downto 0);
+		sd_rd           : out std_logic_vector( 2 downto 0);
+		sd_wr           : out std_logic_vector( 2 downto 0);
 --    sd_ack          : in  std_logic_vector( 1 downto 0);	-- Saving for later when updating to newer framework
 		sd_ack          : in  std_logic;							-- Single Wire while using old framework.
 		sd_buff_addr    : in  std_logic_vector( 8 downto 0);
 		sd_dout         : in  std_logic_vector( 7 downto 0);
 		sd_din          : out std_logic_vector( 7 downto 0);
 		sd_dout_strobe  : in  std_logic;
-
+		
+		-- Tipi Interface ---------------------------------------------------------
+		tipi_crubase	 : in  std_logic_vector( 3 downto 0) := "0000";
+		tipi_en			 : in  std_logic := '0';
+		rpi_clk		 	 : in  std_logic := '0';								-- PI-31
+			-- 0 = Data or 1 = Control byte selection
+		rpi_cd			 : in  std_logic := '0';								-- PI-40
+		rpi_dout			 : in  std_logic := '0';								-- PI-36
+		rpi_le			 : in  std_logic := '0';								-- PI-35
+			-- R|T 0 = RPi or 1 = TI originating data 
+		rpi_rt			 : in  std_logic := '0';								-- PI-33
+		rpi_din			 : out std_logic := '0';								-- PI-38
+		rpi_reset		 : out std_logic := '0';								-- PI-37
+		-- PCODE Interface --------------------------------------------------------
+		pcode_en			 : in std_logic := '0';
+		
 		-- Audio Interface --------------------------------------------------------
 		audio_total_o   : out std_logic_vector(10 downto 0);
 
@@ -115,6 +130,12 @@ entity ep994a is
 		sr_re_o          : out std_logic;
 		sr_addr_o        : out std_logic_vector(14 downto 0);
 		sr_data_i        : in  std_logic_vector( 7 downto 0);
+		
+		-- Cassette Data ----------------------------------------------------------
+		
+		cassette_bit_i   : in std_logic;
+		cassette_bit_o   : out std_logic;
+		tape_audio_en	  : in std_logic;
 			  
 		scratch_1k_i     : in std_logic;
 		cart_type_i      : in std_logic_vector( 3 downto 0);
@@ -125,7 +146,7 @@ entity ep994a is
 		drive_led		  : out std_logic;
 		pause_i			  : in std_logic;
 		sams_en_i		  : in std_logic;
-		cart_8k_banks	  : in std_logic_vector(7 downto 0);
+		cart_8k_banks	  : in std_logic_vector(11 downto 0);
 		is_pal_g         : in boolean
 	);
 end ep994a;
@@ -161,14 +182,14 @@ architecture Behavioral of ep994a is
 			cpu_din          : in  std_logic_vector( 7 downto 0);
 			cpu_dout         : out std_logic_vector( 7 downto 0);
 
-			img_mounted      : in  std_logic_vector( 1 downto 0);
-			img_wp           : in  std_logic_vector( 1 downto 0);
+			img_mounted      : in  std_logic_vector( 2 downto 0);
+			img_wp           : in  std_logic_vector( 2 downto 0);
 			img_ds           : in  std_logic;
 			img_size         : in  std_logic_vector(31 downto 0); -- in bytes
 
 			sd_lba           : out std_logic_vector(31 downto 0);
-			sd_rd            : out std_logic_vector( 1 downto 0);
-			sd_wr            : out std_logic_vector( 1 downto 0);
+			sd_rd            : out std_logic_vector( 2 downto 0);
+			sd_wr            : out std_logic_vector( 2 downto 0);
 --			sd_ack           : in  std_logic_vector( 1 downto 0);
 			sd_ack           : in  std_logic;
 			sd_buff_addr     : in  std_logic_vector( 8 downto 0);
@@ -179,6 +200,63 @@ architecture Behavioral of ep994a is
 		);
 	end component ;
 
+	component tipi_top is
+		port
+		(
+		
+--			db_dir				: out std_logic;	-- Which direction the data is flowing
+--			db_en					: out std_logic;	-- OCTAL BUS' OE line, enable/disable data flow from eeprom
+
+	-- START USER PORT CONNECTION		
+			r_clk					: in  std_logic;
+			-- 0 = Data or 1 = Control byte selection
+			r_cd					: in  std_logic;
+			r_dout				: in  std_logic;
+			r_le					: in  std_logic;
+			-- R|T 0 = RPi or 1 = TI originating data 
+			r_rt					: in  std_logic;
+			r_din					: out std_logic;
+			r_reset				: out std_logic;
+	-- END USER PORT CONNECTION
+
+			ti_dbin				: in  std_logic;		-- TMS9900 CPU_RD   - request for data from bus
+			ti_memen				: in  std_logic;
+			ti_we					: in  std_logic;		-- TMS9900 NOT CPU_WR
+			cru_state			: in  std_logic_vector( 3 downto 0);
+
+			ti_a					: in  std_logic_vector( 15 downto 0);
+			tp_d_i				: in  std_logic_vector( 7 downto 0);
+			tp_d_o				: out std_logic_vector( 7 downto 0)
+			
+		);
+	end component;
+	
+
+	-- TIPI TEMPORARY SIGNALS
+		
+		signal tipi_data	: std_logic_vector(7 downto 0);
+		signal tipi_dsr_data	: std_logic_vector(15 downto 0);
+		signal tipi_dsr_en : std_logic := '0';
+
+	
+	component sprom is
+		generic
+		(
+			init_file		: string := "";
+			awidth			: integer := 14
+		);
+		port
+		(
+			clock				: in std_logic;
+			address			: in std_logic_vector (awidth-1 downto 0);
+			q					: out std_logic_vector (15 downto 0)
+		);
+	end component;
+	
+	
+	
+	
+	
 	signal funky_reset 		: std_logic_vector(15 downto 0) := (others => '0');
 	signal real_reset			: std_logic;
 	signal real_reset_n		: std_logic;
@@ -203,7 +281,7 @@ architecture Behavioral of ep994a is
 	
 	signal debug_sram_ce0 : std_logic;
 	signal debug_sram_we  : std_logic;
-	signal sram_addr_bus  : std_logic_vector(20 downto 0); 
+	signal sram_addr_bus  : std_logic_vector(24 downto 0); 
 	signal sram_16bit_read_bus : std_logic_vector(15 downto 0);	-- choose between (31..16) and (15..0) during reads.
 
 	signal por_n_s          : std_logic;
@@ -239,6 +317,7 @@ architecture Behavioral of ep994a is
 
 	-- Keyboard control
 	signal cru9901			: std_logic_vector(31 downto 0) := x"00000000";	-- 32 write bits to 9901, when cru9901(0)='0'
+	signal cru9901IntMask: std_logic_vector(15 downto 0) := x"0000";		-- 16 bit Interrupt Mask for 9901
 	
 	type keyboard_array is array (7 downto 0, 7 downto 0) of std_logic;
 	
@@ -252,7 +331,7 @@ architecture Behavioral of ep994a is
 	signal basic_rom_bank : std_logic_vector(6 downto 1) := "000000";	-- latch ROM selection, 512K ROM support
 	signal cartridge_cs	 : std_logic;	-- 0x6000..0x7FFF
 	signal mbx_rom_bank : std_logic_vector(1 downto 0);
-	signal uber_rom_bank : std_logic_vector(5 downto 0);
+	signal uber_rom_bank : std_logic_vector(11 downto 0);
 
 	-- audio subsystem
 	signal dac_data		: std_logic_vector(7 downto 0);	-- data from TMS9919 to DAC input
@@ -263,7 +342,18 @@ architecture Behavioral of ep994a is
 	signal audio_data_out: std_logic_vector(7 downto 0);
 	signal audio_o      : std_logic_vector( 7 downto 0);
 
+	-- cassette/tape system
+	signal timer9901Read   : std_logic_vector(13 downto 0); -- TMS 9901 Timer READ Register paused for CRU reading.
+	signal timer9901Load: std_logic_vector(13 downto 0);	-- TMS 9901 Clock Register
+	signal timer9901  : std_logic_vector(13 downto 0); -- TMS 9901 Timer countdown
+	signal tms9901Counter : integer; -- simple counter to track 64 clock cycles @ 3Mhz (916 @ 42.9)
+	constant tms9901NumCycles : integer := 916; -- Calc: CORE_CLK_MHZ / 3MHZ * 64    -- (42954540/3000000) = 14.318 X 64 = 916.36352 (x394), subtract 1 for range 0-393
+--	signal tms9901NumCycles : integer := 916; -- Calc: CORE_CLK_MHZ / 3MHZ * 64    -- (42954540/3000000) = 14.318 X 64 = 916.36352 (x394), subtract 1 for range 0-393
+	signal tms9901IntReq_n : std_logic;
+	signal tape_audio			: std_logic;
+	
 	-- disk subsystem
+	signal fdc_en			: std_logic := '1';
 	signal cru1100_regs  : std_logic_vector(7 downto 0); -- disk controller CRU select
 	alias disk_page_ena  : std_logic is cru1100_regs(0);
 	alias disk_motor_clk : std_logic is cru1100_regs(1);
@@ -308,6 +398,22 @@ architecture Behavioral of ep994a is
 	signal paging_enable_cs : std_logic;	-- access to some registers to enable paging etc.
 	signal paging_regs_visible : std_logic;	-- when 1 page registers can be accessed
 	
+	-- TIPI
+	signal tipi_regs			: std_logic_vector(3 downto 0) := "0000";
+
+	-- PCODE
+	signal pcode_regs			: std_logic_vector(1 downto 0) := "00";
+--	signal pcode_dsr_data	: std_logic_vector(15 downto 0);
+	signal pcode_dsr_bank	: std_logic := '0';
+	
+	-- PCODE-GROM signals
+	signal pcode_grom_data_out		: std_logic_vector(7 downto 0);
+	signal pcode_grom_rd_inc		: std_logic;
+	signal pcode_grom_we				: std_logic;
+	signal pcode_grom_ram_addr		: std_logic_vector(19 downto 0);
+	signal pcode_grom_selected		: std_logic;
+	signal pcode_grom_rd				: std_logic;
+	
 	-- TMS99105 Shield control latch signals (written to control latch during control cycle)
 	signal conl_int   : std_logic;	-- IO2P - indata[1]
 	-- TMS99105 Shield control signal buffer read signals (read during control control cycle)
@@ -349,7 +455,7 @@ architecture Behavioral of ep994a is
 	signal cpu_reset : std_logic;
 	
 	signal cpu_int_req : std_logic;
-	signal cpu_ic03    : std_logic_vector(3 downto 0) := "0001";
+--	signal cpu_ic03    : std_logic_vector(3 downto 0) := "0001";
 	signal cpu_int_ack : std_logic;
 	
 	signal waits : std_logic_vector(7 downto 0);
@@ -491,6 +597,7 @@ begin
 					and cpu_addr(15 downto 12) /= x"9"        -- 9XXX addresses don't go to RAM
 					and cpu_addr(15 downto 11) /= x"8" & '1'  -- 8800-8FFF don't go to RAM
 					and cpu_addr(15 downto 13) /= "000"       -- 0000-1FFF don't go to RAM
+					and cpu_addr(15 downto 13) /= "010"			-- 4000-5FFF don't go to RAM (DISK DSR)
 					and (cartridge_cs='0'                     -- writes to cartridge region do not go to RAM, unless:
 						or (cart_type_i = 1 and cpu_addr(15 downto 10) = "011011")		-- MBX cart is loaded, we allow writes to 6C00+
 						or (cart_type_i = 5 and cpu_addr(15 downto 12) = "0111") )		-- Mini Mem Cart is loaded, we allow writes to 7000-7FFF
@@ -513,9 +620,10 @@ begin
 --	cpu_ready <= '1';
 
 	-------------------------------------
-	-- vdp interrupt
-	-- INTERRUPT <=  vdp_interrupt when cru9901(2)='1' else '1';	-- TMS9901 interrupt mask bit
-	conl_int <= vdp_interrupt when cru9901(2)='1' else '1';	-- TMS9901 interrupt mask bit
+	-- vdp interrupt & Timer Interrupt
+
+	conl_int <= '0' when (tms9901IntReq_n = '0' and cru9901IntMask(3) = '1' and timer9901Load /= 0) or (vdp_interrupt = '0' and cru9901IntMask(2) = '1') else '1';
+
 	-- cartridge memory select
 	cartridge_cs 	<= '1' when MEM_n = '0' and cpu_addr(15 downto 13) = "011" else '0'; -- cartridge_cs >6000..>7FFF
 
@@ -559,13 +667,23 @@ begin
 				debug_sram_ce0 <= '1';
 				debug_sram_WE <= '1';
 				cru9901 <= x"00000000";
+				cru9901IntMask <= x"0000";
 				cru1100_regs <= (others => '0');
 				sams_regs <= (others => '0');
+				tipi_regs <= (others => '0');
+				pcode_regs <= (others => '0');
+				pcode_dsr_bank <= '0';
 				alatch_counter <= (others => '0');
 				cpu_mem_write_pending <= '0';
 				sram_capture <= True;
 				cpu_single_step <= x"00";
 				waits <= (others => '0');
+				timer9901Load <= (others => '0');
+				timer9901 <= (others => '0');
+				tms9901Counter <= 0;
+				tms9901IntReq_n <= '1';
+				timer9901Read <= (others => '0');
+
 			else
 				-- processing of normal clocks here. We run at 100MHz.
 
@@ -603,22 +721,36 @@ begin
 					mbx_rom_bank <= (others => '0');
 					uber_rom_bank <= (others => '0');
 					sams_regs <= x"00";
+					tipi_regs <= "0000";
+					pcode_regs <= (others => '0');
+					pcode_dsr_bank <= '0';
 				end if;
 				if flashLoading='0' and lastFlashLoading='1' then
 					-- flash loading just stopped. Bring CPU out of reset.
 					cpu_reset_ctrl <= x"FF";
 				end if;
 				
+				-- Enable/Disable Floppy Drive Controller based on TIPI CRU Base
+				if(tipi_en = '1' and tipi_crubase = "0001") then fdc_en <= '0';
+				else fdc_en <= '1';
+				end if;
+				
 				---------------------------------------------------------
 				-- SRAM map (1 mega byte, 0..FFFFF, 20 bit address space)
 				---------------------------------------------------------
 				-- 00000..7FFFF - Cartridge module port, paged, 512K, to support the TI megademo :)
-				-- 80000..8FFFF - GROM mapped to this area, 64K (was at 30000)
-				-- 90000..AFFFF - Not used currently
-				-- B0000..B7FFF - DSR area, 32K reserved	(was at 60000)
-				-- B8000..B8FFF - Scratchpad 	(was at 68000)
-				-- BA000..BCFFF - Boot ROM remapped (was at 0)   
-				-- C0000..FFFFF - SAMS SRAM 256K (i.e. the "normal" CPU RAM paged with the SAMS system)
+				-- 80000..9FFFF - GROM mapped to this area, 128K (was at 30000)
+				-- A0000..AFFFF - Not used currently
+				-- B0000..BCFFF - DSR area, 52K reserved	(was at 60000)
+				--		B0000..B7FFF - 32k For Disk roms (TI-FDC = 8k, CC=16K)
+				--		B8000..B8FFF - 4K For Tipi DSR (Currently File is 32K but only 4K DSR Padded with 0s)
+				--		B9000..CBFFF - 76K For PCode DSR+Grom
+				--			B9000..BBFFF - 12k PCode DSR 8K + 4K banked
+				--			BC000..CBFFF - 64k PCode Private Grom
+				-- FD000..FDFFF - Scratchpad 	(was at 68000)
+				-- FE000..FFFFF - Boot ROM remapped (was at 0)   
+				-- 100000..1FFFFF - SAMS SRAM 1M (i.e. the "normal" CPU RAM paged with the SAMS system)
+				-- 200000 and above - Cartridge ROM Space for anything above 512K (Currently up to 32Megs)
 				---------------------------------------------------------
 				-- The SAMS control bits are set to zero on reset.
 				-- sams_regs(0) CRU 1E00: when set, paging registers appear at DSR space >4000..
@@ -641,40 +773,55 @@ begin
 				-- Drive SRAM addresses outputs synchronously 
 				if cpu_access = '1' then
 					if cpu_addr(15 downto 8) = x"98" and cpu_addr(1)='0' then
-						sram_addr_bus <= "00" & x"8" & grom_ram_addr(15 downto 1);	-- 0x80000 GROM
+						sram_addr_bus <= "000000" & x"8" & grom_ram_addr(15 downto 1);	-- 0x80000 GROM
+--						sram_addr_bus <= "0" & x"4" & grom_ram_addr(16 downto 1);	-- 0x80000 GROM
+					elsif cpu_addr(15 downto 0) = x"5BFC" and pcode_en = '1' and pcode_grom_selected = '1' then
+						sram_addr_bus <= "00000" & (x"5E000" + pcode_grom_ram_addr(15 downto 1));	-- 0xBC000..CBFFF PCode GROM
 					elsif cartridge_cs = '1' and cart_type_i = 1 and cpu_addr(12 downto 10) = "011" then
 						-- MBX 6c00-6FFF - RAM
-						sram_addr_bus <= "000000010" & cpu_addr(12 downto 1);
+						sram_addr_bus <= "0000000000010" & cpu_addr(12 downto 1);
 
-						elsif cartridge_cs = '1' and (cart_type_i = 1 or cart_type_i = 2) and cpu_addr(12) = '1' then
+					elsif cartridge_cs = '1' and (cart_type_i = 1 or cart_type_i = 2) and cpu_addr(12) = '1' then
 						-- MBX 7000-7FFF - bank switched area
-						sram_addr_bus <= "00000000" & mbx_rom_bank & cpu_addr(11 downto 1);
+						sram_addr_bus <= "000000000000" & mbx_rom_bank & cpu_addr(11 downto 1);
 
-						elsif cartridge_cs = '1' and sams_regs(5) = '0' and (cart_type_i = 3 or cart_type_i = 4) then
+					elsif cartridge_cs = '1' and sams_regs(5) = '0' and (cart_type_i = 3 or cart_type_i = 4) then
 						-- UberGrom 6000-7FFF - bank switched area
-						sram_addr_bus <= "000" & uber_rom_bank & cpu_addr(12 downto 1);
-
-						elsif cartridge_cs = '1' and sams_regs(5) = '0' then
+						if uber_rom_bank(11 downto 6) = 0 then
+							sram_addr_bus <= "0000000" & uber_rom_bank(5 downto 0) & cpu_addr(12 downto 1);
+						else -- Any cart address over 512K is above the SAMS reserved area (100000..1FFFFF) so we add 0xC0000 to the right shifted address.
+							sram_addr_bus <= std_logic_vector(to_unsigned(786432+to_integer(unsigned(uber_rom_bank(11 downto 0) & cpu_addr(12 downto 1))),25));
+						end if;
+					elsif cartridge_cs = '1' and sams_regs(5) = '0' then
 						-- Handle paging of module port at 0x6000 unless sams_regs(5) is set (1E0A)
-						sram_addr_bus <= "000" & (basic_rom_bank and rommask_i) & cpu_addr(12 downto 1);	-- mapped to 0x00000..0x7FFFF
+						sram_addr_bus <= "0000000" & (basic_rom_bank and rommask_i) & cpu_addr(12 downto 1);	-- mapped to 0x00000..0x7FFFF
 					elsif disk_page_ena='1' and cpu_addr(15 downto 13) = "010" then
 						-- DSR's for disk system
-						sram_addr_bus <= "00" & x"B" & "000" & cpu_addr(12 downto 1);	-- mapped to 0xB0000
+						sram_addr_bus <= "000000" & x"B" & "000" & cpu_addr(12 downto 1);	-- mapped to 0xB0000..0xB7FFFF
+					elsif tipi_regs(0)='1' and cpu_addr(15 downto 13) = "010" then
+						-- DSR's for Tipi system
+						sram_addr_bus <= "000000" & x"B" & "100" & cpu_addr(12 downto 1);	-- mapped to 0xB8000..0xB8FFF
+					elsif pcode_regs(0)='1' and cpu_addr(15 downto 13) = "010" then																-- PCode DSR mapped to 0XB9000..0xBBFFF
+						if cpu_addr(12) = '1' then sram_addr_bus <= "00000" & (x"5D000" + (pcode_dsr_bank & cpu_addr(11 downto 1)));		-- 2 banks for 0x5000..0x5FFF @ 0xBA000..0xBBFFF
+						else sram_addr_bus <= "00000" & (x"5C800" + cpu_addr(12 downto 1));															-- 0x4000..0x4FFF @ 0xB9000..0xB9FFF
+						end if;
+						-- DSR's for PCode system
+--						sram_addr_bus <= "0" & (x"5C800" + (pcode_dsr_bank & cpu_addr(12 downto 1)));	-- mapped to 0xB9000..0xBBFFF
 					elsif cpu_addr(15 downto 13) = "000" and sams_regs(4) = '0' then
 						-- ROM at the bottom of address space not paged unless sams_regs(4) is set (1E08)
-						sram_addr_bus <= "00" & x"B" & "101" & cpu_addr(12 downto 1);	-- mapped to 0xBA000
+						sram_addr_bus <= "000000" & x"F" & "111" & cpu_addr(12 downto 1);	-- mapped to 0xFE000
 					elsif cpu_addr(15 downto 10) = "100000" then
 						-- now that paging is introduced we need to move scratchpad (1k here)
-						-- out of harm's way. Scartchpad at B8000 to keep it safe from paging.
+						-- out of harm's way. Scartchpad at FD000 to keep it safe from paging.
 						if scratch_1k_i='1' then
-							sram_addr_bus <= "00" & x"B8" & "00" & cpu_addr(9 downto 1);
+							sram_addr_bus <= "000000" & x"FD" & "00" & cpu_addr(9 downto 1);
 						else
-							sram_addr_bus <= "00" & x"B8" & X"3" & cpu_addr(7 downto 1);
+							sram_addr_bus <= "000000" & x"FD" & X"3" & cpu_addr(7 downto 1);
 						end if;
 					else
 						-- regular RAM access
 						-- Top 256K is CPU SAMS RAM for now, so we have 18 bit memory addresses for RAM
-							sram_addr_bus <= "11" & translated_addr(7 downto 0) & cpu_addr(11 downto 1);
+							sram_addr_bus <= "000001" & translated_addr(7 downto 0) & cpu_addr(11 downto 1);
 					end if;
 				end if;
 
@@ -682,6 +829,7 @@ begin
 					and cpu_addr(15 downto 12) /= x"9"			-- 9XXX addresses don't go to RAM
 					and cpu_addr(15 downto 11) /= x"8" & '1'	-- 8800-8FFF don't go to RAM
 					and cpu_addr(15 downto 13) /= "000"			-- 0000-1FFF don't go to RAM
+					and cpu_addr(15 downto 13) /= "010"			-- 4000-5FFF don't go to RAM (DISK DSR)
 					and (cartridge_cs='0' 							-- writes to cartridge region do not go to RAM
 						or (cart_type_i = 1 and cpu_addr(15 downto 10) = "011011")	-- MBX Cart
 						or (cart_type_i = 5 and cpu_addr(15 downto 12) = "0111"))	-- MiniMem Cart
@@ -703,10 +851,10 @@ begin
 						debug_sram_WE <= '1';
 						if mem_write_rq = '1' and mem_addr(20)='0' and cpu_holda='1' then
 							-- normal memory write
-							sram_addr_bus <= mem_addr(21 downto 1);	-- setup address
+							sram_addr_bus <= "0000" & mem_addr(21 downto 1);	-- setup address
 							mem_state <= wr0;
 						elsif mem_read_rq = '1' and mem_addr(20)='0' and cpu_holda='1' then
-							sram_addr_bus <= mem_addr(21 downto 1);	-- setup address
+							sram_addr_bus <= "0000" & mem_addr(21 downto 1);	-- setup address
 							mem_state <= rd0;
 						elsif MEM_n = '0' and rd_sampler(1 downto 0) = "10" then
 							-- init CPU read cycle
@@ -781,7 +929,7 @@ begin
 				if cpu_reset_ctrl(1)='0' then
 					basic_rom_bank <= "000000";	-- Reset ROM bank selection
 					mbx_rom_bank <= "00";
-					uber_rom_bank <= "000000";
+					uber_rom_bank <= (others => '0');
 				end if;
 
 				-- CPU signal samplers
@@ -796,6 +944,7 @@ begin
 					vdp_rd <= '0';
 				end if;
 				grom_we <= '0';
+				pcode_grom_we	<= '0';
 				if (psg_ready_s = '1') then
 					tms9919_we <= '0';
 				end if;				
@@ -808,30 +957,32 @@ begin
 							vdp_wr <= '1';
 						elsif cpu_addr(15 downto 8) = x"9C" then
 							grom_we <= '1';			-- GROM writes
+						elsif cpu_addr(15 downto 0) = x"5FFE" and pcode_en = '1' and pcode_regs(0) = '1' then
+							pcode_grom_we <= '1';			-- PCode - GROM writes
 						elsif cartridge_cs='1' and sams_regs(5)='0' and cart_type_i = 0 then
 							basic_rom_bank <= cpu_addr(6 downto 1);	-- capture ROM bank select
 						elsif cartridge_cs='1' and cpu_addr(12 downto 1)='0'&x"FF"&"111" and cart_type_i = 1 then -- mbx bank switch (>6FFE)
 							mbx_rom_bank <= data_from_cpu(9 downto 8);
 						elsif cartridge_cs='1' and cpu_addr(14 downto 3)=x"E00" and cart_type_i = 2 then -- Paged7 bank switch (>7000 - 7006) 
 							mbx_rom_bank <= cpu_addr(2 downto 1);
-						elsif cartridge_cs='1' and cpu_addr(15 downto 12)=x"6" and cart_type_i = 3 then -- Paged378 bank switch (>6000 - 607E) 
-							uber_rom_bank <= (cpu_addr(6 downto 1) and cart_8k_banks(5 downto 0));
+						elsif cartridge_cs='1' and (cpu_addr(15 downto 12)=x"6" or cpu_addr(15 downto 12)=x"7") and cart_type_i = 3 then -- Paged378 bank switch (>6000 - 61FE) 
+							uber_rom_bank <= (cpu_addr(12 downto 1) and cart_8k_banks(11 downto 0));
 						elsif cartridge_cs='1' and cpu_addr(14 downto 7)=x"C0" and cart_type_i = 4 then -- Paged379 bank switch (>6000 - 607E) 
 							uber_rom_bank <= (others => '0');
 							-- Depending on how many banks the cartridge/rom has, we will need to figure out where the paging registers reside,
 							--    since they are inverse (bottom up) than that of say Paged378
 							if cart_8k_banks = 2 then
-								uber_rom_bank <= "00000" & (not cpu_addr(1) and '1');
+								uber_rom_bank <= "00000000000" & (not cpu_addr(1) and '1');
 							elsif cart_8k_banks = 3 or cart_8k_banks = 4 then
-								uber_rom_bank <= "0000" & (not cpu_addr(2 downto 1) and "11");
+								uber_rom_bank <= "0000000000" & (not cpu_addr(2 downto 1) and "11");
 							elsif cart_8k_banks > 4 and cart_8k_banks < 9 then
-								uber_rom_bank <= "000" & (not cpu_addr(3 downto 1) and "111");
+								uber_rom_bank <= "000000000" & (not cpu_addr(3 downto 1) and "111");
 							elsif cart_8k_banks > 8 and cart_8k_banks < 17 then
-								uber_rom_bank <= "00" & (not cpu_addr(4 downto 1) and "1111");
+								uber_rom_bank <= "00000000" & (not cpu_addr(4 downto 1) and "1111");
 							elsif cart_8k_banks > 16 and cart_8k_banks < 33 then
-								uber_rom_bank <= "0" & (not cpu_addr(5 downto 1) and "11111");
+								uber_rom_bank <= "0000000" & (not cpu_addr(5 downto 1) and "11111");
 							elsif cart_8k_banks > 32 and cart_8k_banks < 65 then
-								uber_rom_bank <= not cpu_addr(6 downto 1) and "111111";
+								uber_rom_bank <= "000000" & not cpu_addr(6 downto 1) and "111111";
 							end if;
 						elsif cpu_addr(15 downto 8) = x"84" then	
 							tms9919_we <= '1';		-- Audio chip write
@@ -847,26 +998,138 @@ begin
 					if MEM_n='0' and rd_sampler(1 downto 0)="00" and cpu_addr(15 downto 8) = x"98" then
 						grom_rd <= '1';
 					end if;
+					pcode_grom_rd <= '0';
+					if MEM_n='0' and rd_sampler(1 downto 0)="00" and (cpu_addr(15 downto 0) = x"5BFC" or cpu_addr(15 downto 0) = x"5BFE") then
+						pcode_grom_rd <= '1';
+					end if;
 				end if;
 
+				-- TMS9901
+				-- Not Connected Pins - set to 1 (Inactive)
+				cru9901(1)  <= '1';
+--				-- Map the epGPIO pins to the proper CRU bit even though we don't currently use them
+				cru9901(3)  <= epGPIO_i(0);
+				cru9901(4)  <= epGPIO_i(1);
+				cru9901(5)  <= epGPIO_i(2);
+				cru9901(6)  <= epGPIO_i(3);
+				cru9901(7)  <= epGPIO_i(4);
+				cru9901(8)  <= epGPIO_i(5);
+				cru9901(9)  <= epGPIO_i(6);
+				cru9901(10) <= epGPIO_i(7);
+
+				cru9901(11) <= cassette_bit_i;
+				cru9901(12) <= '1';				-- Always 1 - Attached to Pull up Resistor (5v)
+				cru9901(13) <= cru9901(25);	-- Bit 13 Mirrors Bit 25 (Cassette Out)
+				cru9901(14) <= cru9901(24);	-- Bit 14 Mirrors Bit 24 (Audio Gate)
+				cru9901(15) <= cru9901(23);	-- Bit 15 Mirrors Bit 23 (CS2 Motor)
+				cru9901(16) <= '0';
+				cru9901(17) <= '0';
+
+				-- Other CRU mirroring
+				cru9901(26) <= cru9901(18);	-- Bit 26 Mirrors Bit 18 (Select Keyboard Column or Joystick)
+				cru9901(28) <= cru9901(10);	-- Bit 28 Mirrors Bit 10 (Keyboard)
+				cru9901(27) <= cassette_bit_i;
+				cru9901(29) <= cru9901(9);		-- Bit 29 Mirrors Bit 9  (Keyboard)
+				cru9901(30) <= cru9901(8);		-- Bit 30 Mirrors Bit 8  (Keyboard)
+				cru9901(31) <= cru9901(7);		-- Bit 31 Mirrors Bit 7  (Keyboard)
+
+				cassette_bit_o <= cru9901(25);
+				
+				if tms9901Counter = 0 then											
+					tms9901Counter <= tms9901NumCycles; --"11" & x"94";				-- Reset Ph4 counter to 916 (x394)
+					if timer9901 = 0 and timer9901Load /= 0 then				-- If tms timer hits 0 and the clock register isn't 0, then reset timer and throw an interrupt -- was at 0, but from looks of how Mame process the cycles, it decrements first, then compares to 0 to throw interrupt.  We skip that step
+						timer9901 <= timer9901Load;
+						if cru9901IntMask(3) = '1' then 
+							tms9901IntReq_n <= '0';
+						end if;
+					else
+						timer9901 <= (timer9901 - 1); -- and ("11111111111111");
+					end if;
+				else
+					tms9901Counter <= tms9901Counter - 1;
+				end if;
+				if cru9901(0) = '0' then
+					timer9901Read <= timer9901;					-- TMS timer Read registered updated with current countdown
+				end if;
+
+-----------------------------------------------------------------------------------------------------------
+--------------------------------------------------TMS9901--------------------------------------------------
+-----------------------------------------------------------------------------------------------------------
+------------------------------------------------CRU WRITES-------------------------------------------------
+-----------------------------------------------------------------------------------------------------------
 				-- CRU cycle to TMS9901
 				if MEM_n='1' and cpu_addr(15 downto 8)=x"00" and go_cruclk = '1' then
-					-- write to main register
-					cru9901(to_integer(unsigned(cpu_addr(5 downto 1)))) <= cpu_cruout;
+					if cpu_addr(5 downto 1) = "00000" then -- 0
+						cru9901(0) <= cpu_cruout;
+						if cru9901(0) = '1' then
+							timer9901Read <= timer9901;												-- 9901 just entered timer mode, update timer read register with current timer value
+						end if;
+					elsif cpu_addr(5 downto 1) >= "10000" then -- 16
+						cru9901(to_integer(unsigned(cpu_addr(5 downto 1)))) <= cpu_cruout;
+					elsif cpu_addr(5 downto 1) = "01111" then	-- 15
+						if cru9901(0) = '1' then
+							if cpu_cruout = '0' then													-- A 0 written to bit 15 while in timer mode does a soft reset
+								cru9901(0) <= '0';
+								cru9901IntMask <= x"0000";
+								cru9901IntMask(1) <= '0';
+								cru9901IntMask(2) <= '0';
+								cru9901IntMask(3) <= '0';
+								cru9901(25) <= '0';
+								cru9901(27) <= '0';
+								timer9901Load <= (others => '0');
+								timer9901 <= (others => '0');
+							end if;
+						else
+							cru9901IntMask(15) <= cpu_cruout;
+						end if;
+					else																						-- All other bits (1-14 should only be left)
+						if cru9901(0) = '1' then
+							timer9901Load(to_integer(unsigned(cpu_addr(5 downto 1)))-1) <= cpu_cruout;
+							timer9901 <= timer9901Load;
+							timer9901(to_integer(unsigned(cpu_addr(5 downto 1)))-1) <= cpu_cruout;			-- temporarly doing this because 
+						else
+							cru9901IntMask(to_integer(unsigned(cpu_addr(5 downto 1)))) <= cpu_cruout;
+							if cpu_addr(5 downto 1) = "00011" then -- 3
+								tms9901IntReq_n <= '1';
+							end if;
+						end if;
+					end if;
 				end if;
 
+				
+-- Flandango - CRU writes				
 				-- CRU write cycle to disk control system
-				if MEM_n='1' and cpu_addr(15 downto 4)= x"110" and go_cruclk = '1' then
+				if MEM_n='1' and cpu_addr(15 downto 4)= x"110" and fdc_en = '1' and go_cruclk = '1' then
 					cru1100_regs(to_integer(unsigned(cpu_addr(3 downto 1)))) <= cpu_cruout;
 				end if;
 				-- SAMS register writes. 
 				if MEM_n='1' and cpu_addr(15 downto 4) = x"1E0" and go_cruclk = '1' then
 					sams_regs(to_integer(unsigned(cpu_addr(3 downto 1)))) <= cpu_cruout;
 				end if;				
+--				-- TIPI register writes. 
+				if MEM_n='1' and cpu_addr(15 downto 4) = "0001" & tipi_crubase & "0000" and tipi_en = '1' and go_cruclk = '1' then
+					tipi_regs(to_integer(unsigned(cpu_addr(3 downto 1)))) <= cpu_cruout;
+				end if;				
+				-- PCode register writes. 
+				if MEM_n='1' and cpu_addr(15 downto 4) = x"1F0" and pcode_en = '1' and go_cruclk = '1' then
+					pcode_regs(to_integer(unsigned(cpu_addr(3 downto 1)))) <= cpu_cruout;
+				end if;				
+
+				-- PCode DSR Bank Selection
+				if MEM_n='1' and  cpu_addr(15 downto 0) = x"1F80" and pcode_en = '1' and go_cruclk = '1' then
+					pcode_dsr_bank <= cpu_cruout;
+				end if;
 
 				-- Precompute cru_read_bit in case this cycle is a CRU read 
+-----------------------------------------------------------------------------------------------------------
+--------------------------------------------------TMS9901--------------------------------------------------
+-----------------------------------------------------------------------------------------------------------
+-------------------------------------------------CRU READS-------------------------------------------------
+-----------------------------------------------------------------------------------------------------------
+
 				cru_read_bit <= '1';
-				if cpu_addr(15 downto 1) & '0' >= 6 and cpu_addr(15 downto 1) & '0' < 22 then
+				-- Read Keyboard
+				if cpu_addr(15 downto 1) & '0' >= 6 and cpu_addr(15 downto 1) & '0' < 22 and cru9901(0) = '0' then
 					-- 6 = 0110
 					--	8 = 1000
 					-- A = 1010 
@@ -882,15 +1145,41 @@ begin
 						when 7 => cru_read_bit <= epGPIO_i(7);
 						when others => null;
 					end case;
-
-				elsif cpu_addr(15 downto 1) & '0' = x"0004" then
-					cru_read_bit <= vdp_interrupt; -- VDP interrupt status (read with TB 2 instruction)
+					if ki = 0 and cru9901IntMask(3) = '1' and timer9901Load /= 0 then 										-- If INT3 Mask is enabled and Timer is running, INT3 doesn't generate interrupts so we return a 1 (inactive)
+						cru_read_bit <= '1';
+					end if;
 				elsif cpu_addr(15 downto 1) & '0' = x"0000" then
 					cru_read_bit <= cru9901(0);
-				elsif cpu_addr(15 downto 5) = "00000000001" then
-					-- TMS9901 bits 16..31, addresses 20..3E
-					cru_read_bit <= cru9901(to_integer(unsigned('1' & cpu_addr(4 downto 1))));
-				elsif cpu_addr(15 downto 4) = x"110" then
+				elsif cpu_addr(15 downto 1) & '0' = x"0002" and cru9901(0) = '0' then
+					cru_read_bit <= '1';									-- External Interrupt (not implement at the moment)
+				elsif cpu_addr(15 downto 1) & '0' = x"0004" and cru9901(0) = '0' then
+					cru_read_bit <= vdp_interrupt;					-- VDP interrupt status (read with TB 2 instruction)
+					
+					
+					
+				elsif cpu_addr(15 downto 1) & '0' = x"001E" and cru9901(0) = '1' then
+					cru_read_bit <= conl_int;
+				
+				elsif cpu_addr(15 downto 1) & '0' >= 2 and cpu_addr(15 downto 1) & '0' <= x"1C" and cru9901(0) = '1' then							--Flanny read current 9901 timer read-back register
+					cru_read_bit <= timer9901Read(to_integer(unsigned('0' & cpu_addr(4 downto 1)))-1);
+				elsif cpu_addr(15 downto 1) & '0' >= x"16" and cpu_addr(15 downto 1) & '0' <= x"3E" then		-- 9901 CRU bits 11-31
+					if cpu_addr(15 downto 1) & '0' = x"36" then																-- Tape in, reading directly from cassette_bit_i instead of cru9901(27) to avoid the 1+ cycles offset
+						cru_read_bit <= cassette_bit_i;
+					else
+						cru_read_bit <= cru9901(to_integer(unsigned(cpu_addr(15 downto 1))));
+					end if;
+					if cpu_addr(15 downto 1) & '0' >= x"20" and cru9901(0) = '1' then									-- If 9901 is in timer mode and we do any reads on bits 16+, we get out of timer mode
+						cru9901(0) <= '0';
+						cru_read_bit <= cru9901(to_integer(unsigned(cpu_addr(5 downto 1))));
+					end if;
+
+
+
+-----------------------------------------------------------------------------------------------------------
+------------------------------------------------NON-TMS9901------------------------------------------------
+-----------------------------------------------------------------------------------------------------------
+
+				elsif cpu_addr(15 downto 4) = x"110" and fdc_en = '1' then
 					case to_integer(unsigned(cpu_addr(3 downto 1))) is
 						when 0 => cru_read_bit <= disk_hlt; -- HLD
 						when 1 => cru_read_bit <= cru1100_regs(4) and disk_motor; -- DS1
@@ -904,6 +1193,10 @@ begin
 					end case;
 				elsif cpu_addr(15 downto 4) = x"1E0" then
 					cru_read_bit <= sams_regs(to_integer(unsigned(cpu_addr(3 downto 1))));
+				elsif cpu_addr(15 downto 4) = "0001" & tipi_crubase & "0000" and tipi_en = '1' then
+					cru_read_bit <= tipi_regs(to_integer(unsigned(cpu_addr(3 downto 1))));
+				elsif cpu_addr(15 downto 4) = x"1F0" and pcode_en = '1' then
+					cru_read_bit <= pcode_regs(to_integer(unsigned(cpu_addr(3 downto 1))));
 				end if;
 			end if;
 		end if;	-- rising_edge
@@ -918,14 +1211,20 @@ begin
 
 	vdp_data_out(7 downto 0) <= x"00";
 	data_to_cpu <= 
+		tipi_data & tipi_data when tipi_en = '1' and tipi_regs(0) = '1' and MEM_n = '0' and WE_n = '1' and ( cpu_addr(15 downto 0) >= x"5FF9" and cpu_addr(15 downto 0) <= x"5FFF") else		-- Tipi control registers
+
 		vdp_data_out         			when sams_regs(6)='0' and cpu_addr(15 downto 10) = "100010" else	-- 10001000..10001011 (8800..8BFF)
 		speech_data_out & x"00"       when sams_regs(6)='0' and cpu_addr(15 downto 10) = "100100" and speech_i='1' else	-- speech address read (9000..93FF)
 		x"6000"                       when sams_regs(6)='0' and cpu_addr(15 downto 10) = "100100" and speech_i='0' else	-- speech address read (9000..93FF)
 		grom_data_out & x"00" 			when sams_regs(6)='0' and cpu_addr(15 downto 8) = x"98" and cpu_addr(1)='1' else	-- GROM address read
+		pcode_grom_data_out & x"00" 	when sams_regs(6)='0' and cpu_addr(15 downto 0) = x"5BFE" and pcode_regs(0) = '1' and pcode_en = '1' else	-- GROM address read
 		pager_data_out(7 downto 0) & pager_data_out(7 downto 0) when paging_registers = '1' else	-- replicate pager values on both hi and lo bytes
 		sram_16bit_read_bus(15 downto 8) & x"00" when sams_regs(6)='0' and cpu_addr(15 downto 8) = x"98" and cpu_addr(1)='0' and grom_ram_addr(0)='0' and grom_selected='1' else
 		sram_16bit_read_bus(7 downto 0)  & x"00" when sams_regs(6)='0' and cpu_addr(15 downto 8) = x"98" and cpu_addr(1)='0' and grom_ram_addr(0)='1' and grom_selected='1' else
+		sram_16bit_read_bus(15 downto 8) & x"00" when sams_regs(6)='0' and cpu_addr(15 downto 0) = x"5BFC" and pcode_grom_ram_addr(0)='0' and pcode_grom_selected='1' and pcode_en = '1' else
+		sram_16bit_read_bus(7 downto 0) & x"00" when sams_regs(6)='0' and cpu_addr(15 downto 0) = x"5BFC" and pcode_grom_ram_addr(0)='1' and pcode_grom_selected='1' and pcode_en = '1' else
 	   x"FF00"                       when sams_regs(6)='0' and cpu_addr(15 downto 8) = x"98" and cpu_addr(1)='0' and grom_selected='0' else
+	   x"FF00"                       when sams_regs(6)='0' and cpu_addr(15 downto 0) = x"5BFC" and pcode_grom_selected='0' and pcode_en = '1' else
 		-- CRU space signal reads
 		cru_read_bit & "000" & x"000"	when MEM_n='1' else
 --		x"FFF0"								when MEM_n='1' else -- other CRU
@@ -982,6 +1281,20 @@ begin
 			addr 		=> grom_ram_addr
 		);
 
+	-- GROM implementation for PCode- GROM's are mapped to external RAM
+	pcodegrom : entity work.gromext port map (
+			clk 		=> clk,
+			din 		=> data_from_cpu(15 downto 8),
+			dout		=> pcode_grom_data_out,
+			we 		=> pcode_grom_we,
+			rd 		=> pcode_grom_rd,
+			selected => pcode_grom_selected,	-- output from GROM available, i.e. GROM address is ours
+			mode 		=> cpu_addr(5 downto 1) and "00001",	-- This is a private grom so it only has one base
+			reset 	=> real_reset_n,
+			addr 		=> pcode_grom_ram_addr
+		);
+
+		
 	-- sound chip implementation
 --	TMS9919_CHIP: entity work.tms9919
 --		generic map (
@@ -1063,7 +1376,7 @@ begin
 			 alu_debug_arg1 => open,
 			 alu_debug_arg2 => open,
 			 int_req => cpu_int_req,
-			 ic03 => cpu_ic03,
+			 ic03 => "0001",						--Ti994/A is fixed at this value
 			 int_ack => cpu_int_ack,
 		    cpu_debug_out => open,
 			 cruin => cpu_cruin,
@@ -1096,7 +1409,44 @@ begin
         );
 
 	speech_conv <= unsigned(resize(speech_o,speech_conv'length)) + to_unsigned(128,11) when speech_i = '1' else to_unsigned(0,speech_conv'length);
-	audio_total_o <= std_logic_vector(unsigned("0" & audio_o & "00") + speech_conv);
+
+	tape_audio <= cru9901(27) and cru9901IntMask(3) and not cru9901IntMask(2) and cru9901(22) and not cru9901(24) and tape_audio_en;
+	audio_total_o <= std_logic_vector(unsigned("0" & (audio_o(7) xor cru9901(25)) & audio_o(6 downto 3) & (audio_o(2) xor tape_audio) & audio_o(1 downto 0) & "00") + speech_conv);
+
+	-----------------------------------------------------------------------------
+	-- TIPI
+	-----------------------------------------------------------------------------
+
+	tipi : tipi_top
+	port map
+	(
+		
+--		db_dir		=> tipi_db_dir,	-- Which direction the data is flowing
+--		db_en			=> tipi_db_en,	-- OCTAL BUS' OE line, enable/disable data flow from eeprom
+
+-- START USER PORT CONNECTION		
+		r_clk			=> rpi_clk,
+		-- 0 = Data or 1 = Control byte selection
+		r_cd			=> rpi_cd,
+		r_dout		=> rpi_dout,
+		r_le			=> rpi_le,
+		-- R|T 0 = RPi or 1 = TI originating data 
+		r_rt			=> rpi_rt,
+		r_din			=> rpi_din,
+		r_reset		=> rpi_reset,
+-- END USER PORT CONNECTION
+
+		ti_dbin		=> cpu_rd,		-- TMS9900 CPU_RD   - request for data from bus
+		ti_memen		=> MEM_n,
+		ti_we			=> WE_n,		-- TMS9900 NOT CPU_WR
+		cru_state	=> tipi_regs,
+
+		ti_a	 		=> cpu_addr,
+		tp_d_i		=> data_from_cpu(7 downto 0),
+		tp_d_o		=> tipi_data
+		
+	);
+	
 
 	-----------------------------------------------------------------------------
 	-- Disk subsystem (PHP1240)
@@ -1115,7 +1465,7 @@ begin
 		clk8m_en => disk_clk_en,
 		fd1771 => '1',
 
-		floppy_drive => "11"&not disk_sel(1 downto 0),
+		floppy_drive => "1"&not disk_sel(2 downto 0),
 		floppy_side => not disk_side,
 		floppy_reset => reset_n_s,
 

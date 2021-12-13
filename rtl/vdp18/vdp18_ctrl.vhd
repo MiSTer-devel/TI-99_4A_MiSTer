@@ -83,7 +83,7 @@ architecture rtl of vdp18_ctrl is
   -- This enables a workaround for a bug in XST.
   -- ISE 8.1.02i implements wrong functionality otherwise :-(
   --
-  constant xst_bug_wa_c : boolean := true;
+--  constant xst_bug_wa_c : boolean := true;
   --
   -----------------------------------------------------------------------------
 
@@ -139,49 +139,49 @@ begin
     num_pix_plus_32_v := num_pix_i + 32;
     num_pix_spr_v     := to_integer(num_pix_i and "111111110");
 
-    case opmode_i is
+	case opmode_i is
       -- Graphics I, II and Multicolor Mode -----------------------------------
-      when OPMODE_GRAPH1 |
-           OPMODE_GRAPH2 |
+		when OPMODE_GRAPH1 |
+			  OPMODE_GRAPH2 |
            OPMODE_MULTIC =>
-        --
-        -- Patterns
-        --
-        if vert_active_q then
-          if num_pix_plus_8_v(0) = '0' then
-            if not xst_bug_wa_c then
+			  --
+			  -- Patterns
+			  --
+			if vert_active_q then
+				if num_pix_plus_8_v(0) = '0' then
+--            if not xst_bug_wa_c then
 
             -- original code, we want this
-            case num_pix_plus_8_v(6 to 7) is
-              when "01" =>
-                access_type_s   <= AC_PNT;
-              when "10" =>
-                if opmode_i /= OPMODE_MULTIC then
-                  -- no access to pattern color table in multicolor mode
-                  access_type_s <= AC_PCT;
-                end if;
-              when "11" =>
-                access_type_s   <= AC_PGT;
-              when others =>
-                null;
-            end case;
+					case num_pix_plus_8_v(6 to 7) is
+						when "01" =>
+							access_type_s   <= AC_PNT;
+						when "10" =>
+							if opmode_i /= OPMODE_MULTIC then
+							-- no access to pattern color table in multicolor mode
+								access_type_s <= AC_PCT;
+							end if;
+						when "11" =>
+							access_type_s   <= AC_PGT;
+						when others =>
+							null;
+					end case;
 
-			 else
-
-            -- workaround for XST bug, we need this
-            if    num_pix_plus_8_v(6 to 7) = "01" then
-              access_type_s   <= AC_PNT;
-            elsif num_pix_plus_8_v(6 to 7) = "10" then
-              if opmode_i /= OPMODE_MULTIC then
-                access_type_s <= AC_PCT;
-              end if;
-            elsif num_pix_plus_8_v(6 to 7) = "11" then
-              access_type_s   <= AC_PGT;
-            end if;
-
-            end if;
-          end if;
-        end if;
+--			 else
+--
+--            -- workaround for XST bug, we need this
+--            if    num_pix_plus_8_v(6 to 7) = "01" then
+--              access_type_s   <= AC_PNT;
+--            elsif num_pix_plus_8_v(6 to 7) = "10" then
+--              if opmode_i /= OPMODE_MULTIC then
+--                access_type_s <= AC_PCT;
+--              end if;
+--            elsif num_pix_plus_8_v(6 to 7) = "11" then
+--              access_type_s   <= AC_PGT;
+--            end if;
+--
+--            end if;
+				end if;
+			end if;
 
         --
         -- Sprite test
