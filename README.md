@@ -3,13 +3,14 @@ See below for original readme
 
 - Requires SDRAM Module.  Anything over 2Megs should work.
 - Requires 994aROM.BIN and 994AGROM.BIN for base functionality.
-- Reset and Detach Cart option added to wipe Cartridge Rom/Grom space and SAMS Ram before resetting.
+- Reset and Detach Cart option added to wipe Cartridge Rom/Grom space and SAMS Ram before resetting.  
   This will also clear out any Cart data loaded via Boot0.rom and unsaved MiniMem NVRAM.
 - The Disk and TIPI DSRs along with the PCode System and Speech ROMs are optional [speech working - use 5200 model in OSD] but required if you plan on using the features.
 - System Roms/Groms, along with DSRs are no longer part of the Cartridge roms and are selected/loaded seperately.
-- Switching to a new Cartridge Rom format to help make loading Multi-file cartridges easier.
-  Current "Full/Bin" roms are still supported for the time being but still require seperate System Roms/DSRs.
-  Can independently load Cartridge ROMs and Groms.  Multiple C/D must be properly combined before hand, same goes for Multiple Grom files.  Do note multi-grom files need to be padded to 8k each file before merging.
+- Switching to a new Cartridge Rom format to help make loading Multi-file cartridges easier.  
+  Current "Full/Bin" roms are still supported for the time being but still require seperate System Roms/DSRs.  
+  Can independently load Cartridge ROMs and Groms.  Multiple C/D must be properly combined before hand, same goes for Multiple Grom files.  
+  Do note multi-grom files need to be padded to 8k each file before merging.
 - Supports cartridges up to 32Megs (non-M99 roms can be loaded via the *Load Rom Cart* menu option.
 - Support for MBX, Paged7, Paged378, Paged379 and MiniMem Cartridges.
 - MiniMem utilizes 4K NVRAM file.  Use the MiniMem OSD sub menu to Select the NVRAM file then Load/Save to use it. A Blank 4k NVRAM.dat file is in the Releases folder.
@@ -25,38 +26,41 @@ See below for original readme
 - Original pyTIrom scripts for legacy Full/Bin files are here: [pyTIrom](https://github.com/GHPS/pyTIrom)
 
 ## TIPI User I/O to Raspberry PI Wiring:
-RPI PIN   USER PORT PIN    USB Name    USB 3.1 Breakout Board Pin*
-  31            6            TX+                  (9)
-  33            2            TX-                  (8)
-  35            3           GND_D                 (7)
-  36            1            D-                   (2)
-  37            0            D+                   (3)
-  38            4            RX+                  (6)
-  39            -      GND/SHIELD (NOT GND_D!)    (10)
-  40            5            RX-                  (5)
-* USB Breakout Board model B01MRK0REP used for reference.  Other board's noted pin #s may not match.
-**If you will use a breakout board, it MUST be a USB 3.1 Breakout board with 10 pins**
-Tipi on Raspberry PI Zero W via the USER IO can be flaky and may require code modification to get it working which beyond this README file.
-Instructions to modify the code to get a RPI Zero W working with MiSter will be in the [tipi_rpi_zero.md](tipi_rpi_zero.md) file.
+
+|RPI PIN|USER PORT PIN|USB Name|USB 3.1 Breakout Board Pin|
+|:----:|:------------:|:--------:|:------------------------:|
+|  31  |      6       |   TX+    |           (9)            |
+|  33  |      2       |   TX-    |           (8)            |
+|  35  |      3       |   GND_D  |           (7)            |
+|  36  |      1       |    D-    |           (2)            |
+|  37  |      0       |    D+    |           (3)            |
+|  38  |      4       |   RX+    |           (6)            |
+|  39  |      -       |GND/SHIELD|           (10)           |
+|  40  |      5       |   RX-    |           (5)            |
+    
+- USB Breakout Board model B01MRK0REP used for reference.  Other board's noted pin #s may not match.
+- **If you will use a breakout board, it MUST be a USB 3.1 Breakout board with 10 pins**
+- Tipi on Raspberry PI Zero W via the USER IO can be flaky and may require code modification to get it working which beyond this README file.
+- Instructions to modify the code to get a RPI Zero W working with MiSter will be in the [tipi_rpi_zero.md](tipi_rpi_zero.md) file.
 
 ## System Roms, Groms and DSRs
 - These roms are no longer bundled with each cartridge rom and now must be specified in the **Hardware** submenu.
 - The Roms/Groms/DSRs specified in the Hardware submenu persist through reboots.
-- The *System Grom* (994AGROM.BIN) and the *System Rom* (994aROM.BIN) are required at a minimum.
-  Alternate Grom/Roms (ex 994AGrom-QI.BIN) can also be specified and can be swapped on the fly.
+- The *System Grom* (994AGROM.BIN) and the *System Rom* (994aROM.BIN) are required at a minimum.  
+  Alternate Grom/Roms (ex 994AGrom-QI.BIN) can also be used.
 - The Disk, TIPI and PCode DSR/Roms are optional, but required if you want to use the related feature.
 - File names are not important, but must end in **.bin**.
 
 ## Original README 
 
 # EP994A
-My TI-99/4A clone implemented with a TMS99105 CPU and FPGA (master branch).
-Another version of the clone (the latest development in soft-cpu branch) includes my own
-TMS9900 CPU core written in VHDL.
+My TI-99/4A clone implemented with a TMS99105 CPU and FPGA (master branch).  
+Another version of the clone (the latest development in soft-cpu branch) includes my own  
+TMS9900 CPU core written in VHDL.  
 
-See the file LICENSE for license terms. At least for now (without contributors from others)
-the source code is made available under the LGPL license terms.
-You need to retain copyright notices in the source code.
+See the file LICENSE for license terms. At least for now (without contributors from others)  
+the source code is made available under the LGPL license terms.  
+You need to retain copyright notices in the source code.  
 
 Latest changes
 --------------
@@ -112,3 +116,4 @@ About the directories
 **schematics** the schematics of the protoboard (incl. CPU, clock, a buffer chip) connected to the FPGA board. Note: the schematics are in a need of an update, the current version lacks to wires:
 - CPU reset from FPGA to buffer to CPU
 - VDP interrupt signal from FPGA to buffer to CPU
+
