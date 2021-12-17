@@ -165,7 +165,7 @@ end process;
 	data_o <= rdata when readbyte='1' else (status & b"00000");
 	LpcData <= add8_i when external='0' else ex_bit when speech_off='0' else '1';
 
-	process(clk_i, reset)
+	process(clk_i, reset, RomAdr)
 		variable inc1 : boolean;
 		variable dec1 : boolean;
 	begin
