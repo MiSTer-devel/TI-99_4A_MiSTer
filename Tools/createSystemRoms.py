@@ -82,7 +82,7 @@ if __name__ == "__main__":
 
     if os.path.exists(lsArguments.romPath+"/ti99_speech.zip"):
         print(f'Found ti99_speech.zip')
-        romList=["cd2325a.vsm", "cd2326a.vsm"]
+        romList=["cd2325a.u2a", "cd2326a.u2b"]
         SpeechRom=bytearray()
         with ZipFile(lsArguments.romPath+"/ti99_speech.zip",'r') as zip:
             for rom in romList:
@@ -103,3 +103,14 @@ if __name__ == "__main__":
         with open(lsArguments.OutputPath+"/Disk.BIN",'wb') as fOutputFile:
             fOutputFile.write(DiskRom)
         print(f'    Created {lsArguments.OutputPath}/Disk.BIN\n')
+
+    if os.path.exists(lsArguments.romPath+"/ti99_ddcc1.zip"):
+        print(f'Found ti99_ddcc1.zip')
+        romList=["ddcc1.u3"]
+        DiskRom=bytearray()
+        with ZipFile(lsArguments.romPath+"/ti99_ddcc1.zip",'r') as zip:
+            for rom in romList:
+                DiskRom.extend(zip.read(rom))
+        with open(lsArguments.OutputPath+"/Myarc.BIN",'wb') as fOutputFile:
+            fOutputFile.write(DiskRom)
+        print(f'    Created {lsArguments.OutputPath}/Myarc.BIN\n')

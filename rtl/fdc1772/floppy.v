@@ -159,8 +159,8 @@ always @(posedge clk) begin
 			sec_state <= SECTOR_STATE_GAP;     // track starts with gap
 			case(interleave_mode)
 				0: current_sector <= 4'd0;
-				1: current_sector <= 4'd1;
-				default: current_sector <= 4'd1;
+				1: current_sector <= 3'b000 & sector_base;
+				default: current_sector <= 3'b000 & sector_base;
 			endcase
 //			current_sector <= start_sector;    // track starts with sector 1
 		end else begin
