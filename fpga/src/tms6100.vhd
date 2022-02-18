@@ -58,7 +58,7 @@ begin
 	addr_o <= addr(14 downto 0);
 	add_all <= add8_i & add4_i & add2_i & add1_i;
 	
-	process(clk_i, reset)
+	process(clk_i, ce_n_i, reset)
 	variable k : std_logic;
 	begin
 		if reset = '1' then

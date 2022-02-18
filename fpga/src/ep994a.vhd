@@ -94,18 +94,26 @@ entity ep994a is
 		vblank_o        : out std_logic;
 		comp_sync_n_o   : out std_logic;
 		-- Disk interface ---------------------------------------------------------
+		myarcfdc_en     : in std_logic;
+		myarc80         : in std_logic;
+		fdc_turbo       : in std_logic;
+		myarcSwitches   : in std_logic_vector( 2 downto 0);
+
 		img_mounted     : in  std_logic_vector( 2 downto 0);
 		img_wp          : in  std_logic_vector( 2 downto 0);
 		img_size        : in  std_logic_vector(31 downto 0); -- in bytes
 
-		sd_lba          : out std_logic_vector(31 downto 0);
+		sd_lba_fd0      : out std_logic_vector(31 downto 0); -- Not doing Arrays in VDHL...they are pissing me off
+		sd_lba_fd1      : out std_logic_vector(31 downto 0);
+		sd_lba_fd2      : out std_logic_vector(31 downto 0);
 		sd_rd           : out std_logic_vector( 2 downto 0);
 		sd_wr           : out std_logic_vector( 2 downto 0);
---    sd_ack          : in  std_logic_vector( 1 downto 0);	-- Saving for later when updating to newer framework
-		sd_ack          : in  std_logic;							-- Single Wire while using old framework.
+      sd_ack          : in  std_logic_vector( 2 downto 0);	-- Saving for later when updating to newer framework
 		sd_buff_addr    : in  std_logic_vector( 8 downto 0);
 		sd_dout         : in  std_logic_vector( 7 downto 0);
-		sd_din          : out std_logic_vector( 7 downto 0);
+		sd_din_fd0      : out std_logic_vector( 7 downto 0); -- Not doing Arrays in VDHL...they are pissing me off
+		sd_din_fd1      : out std_logic_vector( 7 downto 0);
+		sd_din_fd2      : out std_logic_vector( 7 downto 0);
 		sd_dout_strobe  : in  std_logic;
 		
 		-- Tipi Interface ---------------------------------------------------------
@@ -161,13 +169,16 @@ architecture Behavioral of ep994a is
 	component fdc1772 is
 		generic (
 			CLK              : integer := 42954540;  -- old values tried with different ram/success : 42666000 42800000 42680000 42856000
-			--			CLK_EN           : integer := 2033;
+--			CLK_EN           : integer := 8500;
 			SECTOR_SIZE_CODE : integer := 1  -- 256 bytes/sector
 		);
 		port (
 			clkcpu           : in  std_logic;
 			clk8m_en         : in  std_logic;
 			fd1771           : in  std_logic;
+			dden             : in  std_logic;
+			turbo            : in  std_logic;
+			fd80             : in  std_logic;
 
 			floppy_drive     : in  std_logic_vector( 3 downto 0);
 			floppy_side      : in  std_logic;
@@ -187,14 +198,17 @@ architecture Behavioral of ep994a is
 			img_ds           : in  std_logic;
 			img_size         : in  std_logic_vector(31 downto 0); -- in bytes
 
-			sd_lba           : out std_logic_vector(31 downto 0);
+			sd_lba_fd0       : out std_logic_vector(31 downto 0);
+			sd_lba_fd1       : out std_logic_vector(31 downto 0);
+			sd_lba_fd2       : out std_logic_vector(31 downto 0);
 			sd_rd            : out std_logic_vector( 2 downto 0);
 			sd_wr            : out std_logic_vector( 2 downto 0);
---			sd_ack           : in  std_logic_vector( 1 downto 0);
-			sd_ack           : in  std_logic;
+			sd_ack           : in  std_logic_vector( 2 downto 0);
 			sd_buff_addr     : in  std_logic_vector( 8 downto 0);
 			sd_dout          : in  std_logic_vector( 7 downto 0);
-			sd_din           : out std_logic_vector( 7 downto 0);
+			sd_din_fd0       : out std_logic_vector( 7 downto 0);
+			sd_din_fd1       : out std_logic_vector( 7 downto 0);
+			sd_din_fd2       : out std_logic_vector( 7 downto 0);
 			sd_dout_strobe   : in  std_logic;
 			drive_led		  : out std_logic
 		);
@@ -204,8 +218,6 @@ architecture Behavioral of ep994a is
 		port
 		(
 		
---			db_dir				: out std_logic;	-- Which direction the data is flowing
---			db_en					: out std_logic;	-- OCTAL BUS' OE line, enable/disable data flow from eeprom
 
 	-- START USER PORT CONNECTION		
 			r_clk					: in  std_logic;
@@ -348,19 +360,21 @@ architecture Behavioral of ep994a is
 	signal timer9901  : std_logic_vector(13 downto 0); -- TMS 9901 Timer countdown
 	signal tms9901Counter : integer; -- simple counter to track 64 clock cycles @ 3Mhz (916 @ 42.9)
 	constant tms9901NumCycles : integer := 916; -- Calc: CORE_CLK_MHZ / 3MHZ * 64    -- (42954540/3000000) = 14.318 X 64 = 916.36352 (x394), subtract 1 for range 0-393
---	signal tms9901NumCycles : integer := 916; -- Calc: CORE_CLK_MHZ / 3MHZ * 64    -- (42954540/3000000) = 14.318 X 64 = 916.36352 (x394), subtract 1 for range 0-393
 	signal tms9901IntReq_n : std_logic;
 	signal tape_audio			: std_logic;
 	
 	-- disk subsystem
+	signal tifdc_en		: std_logic := '0';				  -- EITHER tifdc_en OR myarcfdc_en can be enabled at a time.
 	signal fdc_en			: std_logic := '1';
 	signal cru1100_regs  : std_logic_vector(7 downto 0); -- disk controller CRU select
+	signal m80_tracks    : std_logic;                    -- For 80 Track capable MyArc FDC, Force 80 Track mode for 360K images.
 	alias disk_page_ena  : std_logic is cru1100_regs(0);
 	alias disk_motor_clk : std_logic is cru1100_regs(1);
 	alias disk_wait_en   : std_logic is cru1100_regs(2);
 	alias disk_hlt       : std_logic is cru1100_regs(3);
 	alias disk_sel       : std_logic_vector(2 downto 0) is cru1100_regs(6 downto 4);
-	alias disk_side      : std_logic is cru1100_regs(7);
+--	alias disk_side      : std_logic is cru1100_regs(7);
+   signal disk_side     : std_logic;
 	signal disk_ds       : std_logic;
 	signal disk_motor_clk_d : std_logic;
 	signal disk_motor    : std_logic;
@@ -378,6 +392,10 @@ architecture Behavioral of ep994a is
 	signal disk_atn      : std_logic;
 	signal disk_din      : std_logic_vector(7 downto 0);
 	signal disk_dout     : std_logic_vector(7 downto 0);
+	signal floppy_reset  : std_logic;
+	signal floppy_addr   : std_logic_vector(1 downto 0);
+	signal rst_sampler	: std_logic_vector(3 downto 0) := "0000";
+	signal dden				: std_logic;
 
 	-- Speech signals
 	signal speech_data_out	: std_logic_vector(7 downto 0);
@@ -597,7 +615,8 @@ begin
 					and cpu_addr(15 downto 12) /= x"9"        -- 9XXX addresses don't go to RAM
 					and cpu_addr(15 downto 11) /= x"8" & '1'  -- 8800-8FFF don't go to RAM
 					and cpu_addr(15 downto 13) /= "000"       -- 0000-1FFF don't go to RAM
-					and cpu_addr(15 downto 13) /= "010"			-- 4000-5FFF don't go to RAM (DISK DSR)
+					and ((tifdc_en = '1' and cpu_addr(15 downto 13) /= "010") or			-- 4000-5FFF don't go to RAM (DISK DSR)
+					     (myarcfdc_en = '1' and cpu_addr(15 downto 12) /= "0100") )			-- 4000-5FFF don't go to RAM (DISK DSR)
 					and (cartridge_cs='0'                     -- writes to cartridge region do not go to RAM, unless:
 						or (cart_type_i = 1 and cpu_addr(15 downto 10) = "011011")		-- MBX cart is loaded, we allow writes to 6C00+
 						or (cart_type_i = 5 and cpu_addr(15 downto 12) = "0111") )		-- Mini Mem Cart is loaded, we allow writes to 7000-7FFF
@@ -795,9 +814,21 @@ begin
 					elsif cartridge_cs = '1' and sams_regs(5) = '0' then
 						-- Handle paging of module port at 0x6000 unless sams_regs(5) is set (1E0A)
 						sram_addr_bus <= "0000000" & (basic_rom_bank and rommask_i) & cpu_addr(12 downto 1);	-- mapped to 0x00000..0x7FFFF
-					elsif disk_page_ena='1' and cpu_addr(15 downto 13) = "010" then
-						-- DSR's for disk system
-						sram_addr_bus <= "000000" & x"B" & "000" & cpu_addr(12 downto 1);	-- mapped to 0xB0000..0xB7FFFF
+					--Flandango: Handle the two different FDC.
+
+					elsif disk_page_ena='1' and tifdc_en='1' and cpu_addr(15 downto 13) = "010" then
+						-- DSR's for disk system (TI-FDC) 0x4000..0x5FFF
+						sram_addr_bus <= "000000" & x"B" & "000" & cpu_addr(12 downto 1);	-- mapped to 0xB0000..0xB7FFF
+
+					elsif disk_page_ena='1' and myarcfdc_en='1' and cpu_addr(15 downto 12) = "0100" then
+						-- DSR's for disk system (MYARC-FDC) 0x4000..0x4FFF (2 pages of 4k)
+						sram_addr_bus <= "000000" & x"B" & "000" & cru1100_regs(3) & cpu_addr(11 downto 1);	-- mapped to 0xB0000..0xB0FFF
+
+					elsif disk_page_ena='1' and myarcfdc_en='1' and cpu_addr(15 downto 12) = "0101" then
+						-- MYARC's FDC SDRAM 0x5000..0x5FFF shift it by 0x1000 since DSR is two banks of 4K
+						sram_addr_bus <= "000000" & x"B" & "0010" & cpu_addr(11 downto 1);	-- mapped to 0xB2000..0xB2FFF
+
+
 					elsif tipi_regs(0)='1' and cpu_addr(15 downto 13) = "010" then
 						-- DSR's for Tipi system
 						sram_addr_bus <= "000000" & x"B" & "100" & cpu_addr(12 downto 1);	-- mapped to 0xB8000..0xB8FFF
@@ -829,7 +860,8 @@ begin
 					and cpu_addr(15 downto 12) /= x"9"			-- 9XXX addresses don't go to RAM
 					and cpu_addr(15 downto 11) /= x"8" & '1'	-- 8800-8FFF don't go to RAM
 					and cpu_addr(15 downto 13) /= "000"			-- 0000-1FFF don't go to RAM
-					and cpu_addr(15 downto 13) /= "010"			-- 4000-5FFF don't go to RAM (DISK DSR)
+					and ((tifdc_en = '1' and cpu_addr(15 downto 13) /= "010") or			-- 4000-5FFF don't go to RAM (DISK DSR)
+					     (myarcfdc_en = '1' and cpu_addr(15 downto 12) /= "0100") )			-- 4000-fFFF don't go to RAM (DISK DSR)
 					and (cartridge_cs='0' 							-- writes to cartridge region do not go to RAM
 						or (cart_type_i = 1 and cpu_addr(15 downto 10) = "011011")	-- MBX Cart
 						or (cart_type_i = 5 and cpu_addr(15 downto 12) = "0111"))	-- MiniMem Cart
@@ -938,6 +970,9 @@ begin
 				end if;
 				wr_sampler <= wr_sampler(wr_sampler'length-2 downto 0) & WE_n;
 				rd_sampler <= rd_sampler(rd_sampler'length-2 downto 0) & RD_n;
+				if myarcfdc_en = '1' and disk_page_ena = '1' then
+					rst_sampler <= rst_sampler(rst_sampler'length-2 downto 0) & cru1100_regs(1);
+				end if;
 				cruclk_sampler <= cruclk_sampler(cruclk_sampler'length-2 downto 0) & cpu_cruclk;
 				if (clk_en_10m7_i = '1') then
 					vdp_wr <= '0';
@@ -971,7 +1006,7 @@ begin
 							uber_rom_bank <= (others => '0');
 							-- Depending on how many banks the cartridge/rom has, we will need to figure out where the paging registers reside,
 							--    since they are inverse (bottom up) than that of say Paged378
-							if cart_8k_banks = 2 then
+							if cart_8k_banks = 1 or cart_8k_banks = 2 then
 								uber_rom_bank <= "00000000000" & (not cpu_addr(1) and '1');
 							elsif cart_8k_banks = 3 or cart_8k_banks = 4 then
 								uber_rom_bank <= "0000000000" & (not cpu_addr(2 downto 1) and "11");
@@ -1180,17 +1215,31 @@ begin
 -----------------------------------------------------------------------------------------------------------
 
 				elsif cpu_addr(15 downto 4) = x"110" and fdc_en = '1' then
-					case to_integer(unsigned(cpu_addr(3 downto 1))) is
-						when 0 => cru_read_bit <= disk_hlt; -- HLD
-						when 1 => cru_read_bit <= cru1100_regs(4) and disk_motor; -- DS1
-						when 2 => cru_read_bit <= cru1100_regs(5) and disk_motor; -- DS2
-						when 3 => cru_read_bit <= cru1100_regs(6) and disk_motor; -- DS3
-						when 4 => cru_read_bit <= not disk_motor;
-						when 5 => cru_read_bit <= '0';
-						when 6 => cru_read_bit <= '1';
-						when 7 => cru_read_bit <= disk_side;
-						when others => null;
-					end case;
+					if tifdc_en = '1' then
+						case to_integer(unsigned(cpu_addr(3 downto 1))) is
+							when 0 => cru_read_bit <= disk_hlt; -- HLD
+							when 1 => cru_read_bit <= cru1100_regs(4) and disk_motor; -- DS1
+							when 2 => cru_read_bit <= cru1100_regs(5) and disk_motor; -- DS2
+							when 3 => cru_read_bit <= cru1100_regs(6) and disk_motor; -- DS3
+							when 4 => cru_read_bit <= not disk_motor;
+							when 5 => cru_read_bit <= '0';
+							when 6 => cru_read_bit <= '1';
+							when 7 => cru_read_bit <= disk_side;
+							when others => null;
+						end case;
+					elsif myarcfdc_en = '1' then
+						case to_integer(unsigned(cpu_addr(3 downto 1))) is
+							when 0 => cru_read_bit <= disk_irq; -- Disk INTRQ
+							when 1 => cru_read_bit <= disk_drq; -- Disk DRQ
+							when 2 => cru_read_bit <= '0'; --fdc_turbo;      -- Turbo mode (currently not implemented)
+							when 3 => cru_read_bit <= null;     -- Not connected on real hardware
+							when 4 => cru_read_bit <= '0'                 ; -- Drive 4 Head Seek Speed   0 = 6ms, 1= 20ms/2ms (FD1770/FD1772) (bit flipped when read by cru)
+							when 5 => cru_read_bit <= not myarcSwitches(2); -- Drive 3 Head Seek Speed   0 = 6ms, 1= 20ms/2ms (FD1770/FD1772) (bit flipped when read by cru)
+							when 6 => cru_read_bit <= not myarcSwitches(1); -- Drive 2 Head Seek Speed   0 = 6ms, 1= 20ms/2ms (FD1770/FD1772) (bit flipped when read by cru)
+							when 7 => cru_read_bit <= not myarcSwitches(0); -- Drive 1 Head Seek Speed   0 = 6ms, 1= 20ms/2ms (FD1770/FD1772) (bit flipped when read by cru)
+							when others => null;
+						end case;
+					end if;
 				elsif cpu_addr(15 downto 4) = x"1E0" then
 					cru_read_bit <= sams_regs(to_integer(unsigned(cpu_addr(3 downto 1))));
 				elsif cpu_addr(15 downto 4) = "0001" & tipi_crubase & "0000" and tipi_en = '1' then
@@ -1198,10 +1247,14 @@ begin
 				elsif cpu_addr(15 downto 4) = x"1F0" and pcode_en = '1' then
 					cru_read_bit <= pcode_regs(to_integer(unsigned(cpu_addr(3 downto 1))));
 				end if;
+
 			end if;
 		end if;	-- rising_edge
 	end process;
 
+	tifdc_en <= not myarcfdc_en;
+	disk_side <= cru1100_regs(7) when tifdc_en = '1' else cru1100_regs(2) when myarcfdc_en = '1';
+	
 	cpu_hold <= '1' when mem_read_rq='1' or mem_write_rq='1' or (cpu_single_step(0)='1' and cpu_single_step(1)='0') 
 							or flashLoading = '1' or pause_i = '1' else '0'; -- issue DMA request
 	--DEBUG1 <= go_write;
@@ -1230,7 +1283,8 @@ begin
 --		x"FFF0"								when MEM_n='1' else -- other CRU
 		-- line below commented, paged memory repeated in the address range as opposed to returning zeros outside valid range
 		--	x"0000"							when translated_addr(15 downto 6) /= "0000000000" else -- paged memory limited to 256K for now
-		not disk_dout&not disk_dout when disk_cs = '1' else
+		not disk_dout & not disk_dout when disk_cs = '1' and tifdc_en = '1' else
+		disk_dout & disk_dout         when disk_cs = '1' and myarcfdc_en = '1' else
 		sram_16bit_read_bus(15 downto 0);		-- data to CPU
 	
   -----------------------------------------------------------------------------
@@ -1452,22 +1506,28 @@ begin
 	-- Disk subsystem (PHP1240)
 	-----------------------------------------------------------------------------
 	disk_ds <= '1' when unsigned(img_size(19 downto 8)) > 360 else '0';
-	disk_cs <= '1' when disk_page_ena = '1' and cpu_addr(15 downto 4) = x"5FF" and (disk_rd = '1' or disk_wr = '1') else '0';
-	disk_rd <= not cpu_addr(3) and cpu_rd;
-	disk_wr <= cpu_addr(3) and cpu_wr;
+	disk_cs <= '1' when disk_page_ena = '1' and ((tifdc_en = '1' and cpu_addr(15 downto 4) = x"5FF") or (myarcfdc_en = '1' and cpu_addr(15 downto 3) = x"5F0" & '0')) and (disk_rd = '1' or disk_wr = '1') else '0';
+	disk_rd <= not cpu_addr(3) and cpu_rd when tifdc_en = '1' else cpu_rd when myarcfdc_en = '1' and disk_page_ena = '1' else '0';
+	disk_wr <= cpu_addr(3) and cpu_wr when tifdc_en = '1' else cpu_wr when myarcfdc_en = '1' and disk_page_ena = '1' else '0';
 	disk_rw <= not disk_wr;
-	disk_din <= not data_from_cpu(15 downto 8);
+	disk_din <= not data_from_cpu(15 downto 8) when tifdc_en = '1' else data_from_cpu(7 downto 0) when myarcfdc_en = '1';
+	floppy_reset <= '0' when reset_n_s = '0' or rst_sampler = "0001" else '1';
+	dden <= '1' when tifdc_en = '1' else cru1100_regs(3) when myarcfdc_en = '1' else '0';
+	m80_tracks <= '1' when myarc80 = '1' and ((disk_sel = "001" and myarcSwitches(0) = '1') or (disk_sel = "010" and myarcSwitches(1) = '1') or (disk_sel = "100" and myarcSwitches(2) = '1')) else '0';
 
 	fdc : fdc1772
 	port map
 	(
 		clkcpu  => clk,
 		clk8m_en => disk_clk_en,
-		fd1771 => '1',
+		fd1771 => tifdc_en,
+		dden => dden,
+		turbo => fdc_turbo,
+		fd80 => m80_tracks,
 
 		floppy_drive => "1"&not disk_sel(2 downto 0),
 		floppy_side => not disk_side,
-		floppy_reset => reset_n_s,
+		floppy_reset => floppy_reset,
 
 		irq => disk_irq,
 		drq => disk_drq,
@@ -1484,13 +1544,17 @@ begin
 		img_size => img_size,
 		img_ds => disk_ds,
 
-		sd_lba => sd_lba,
+		sd_lba_fd0 => sd_lba_fd0,
+		sd_lba_fd1 => sd_lba_fd1,
+		sd_lba_fd2 => sd_lba_fd2,
 		sd_rd => sd_rd,
 		sd_wr => sd_wr,
 		sd_ack => sd_ack,
 		sd_buff_addr => sd_buff_addr,
 		sd_dout => sd_dout,
-		sd_din => sd_din,
+		sd_din_fd0 => sd_din_fd0,
+		sd_din_fd1 => sd_din_fd1,
+		sd_din_fd2 => sd_din_fd2,
 		sd_dout_strobe => sd_dout_strobe,
 		drive_led => drive_led
 	);
@@ -1529,7 +1593,7 @@ begin
 	end process;
 
 	cpu_ready <= disk_rdy;
-	disk_rdy <= '1' when disk_wait_en = '0' or disk_proceed = '1' or disk_cs = '0' else '0';
+	disk_rdy <= '1' when (tifdc_en = '1' and disk_wait_en = '0') or disk_proceed = '1' or disk_cs = '0' or myarcfdc_en = '1' else '0';
 	-- disk wait generation
 	process(clk, reset_n_s)
 	begin

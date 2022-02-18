@@ -28,7 +28,7 @@ module emu
 	input         RESET,
 
 	//Must be passed to hps_io module
-	inout  [45:0] HPS_BUS,
+	inout  [48:0] HPS_BUS,
 
 	//Base video clock. Usually equals to CLK_SYS.
 	output        CLK_VIDEO,
@@ -54,7 +54,7 @@ module emu
 
 	input  [11:0] HDMI_WIDTH,
 	input  [11:0] HDMI_HEIGHT,
-//	output        HDMI_FREEZE,
+	output        HDMI_FREEZE,
 
 `ifdef MISTER_FB
 	// Use framebuffer in DDRAM (USE_FB=1 in qsf)
@@ -185,6 +185,14 @@ assign {SD_SCK, SD_MOSI, SD_CS} = 'Z;
 assign {DDRAM_CLK, DDRAM_BURSTCNT, DDRAM_ADDR, DDRAM_DIN, DDRAM_BE, DDRAM_RD, DDRAM_WE} = 0;
 //assign {SDRAM_CLK, SDRAM_CKE, SDRAM_A, SDRAM_BA, SDRAM_DQML, SDRAM_DQMH, SDRAM_nCS, SDRAM_nCAS, SDRAM_nWE} = 'z;
 assign VGA_SCALER = 0;
+assign HDMI_FREEZE = 0;
+
+// number of blocks-1, total size ((sd_blk_cnt+1)*(1<<(BLKSZ+7))) must be <= 16384!
+// Not used at the moment so setting everything to 0.
+assign sd_blk_cnt[0] = 6'd0;
+assign sd_blk_cnt[1] = 6'd0;
+assign sd_blk_cnt[2] = 6'd0;
+assign sd_blk_cnt[3] = 6'd0;
 
 
 assign LED_USER  = ioctl_download | drive_led | loading_nv;
@@ -192,6 +200,7 @@ assign LED_DISK  = 0;
 assign LED_POWER = 0;
 assign BUTTONS   = osd_btn;
 assign ps2_kbd_led_status[0] = btn_al;			// Synch Alpha Lock with Caps Lock LED
+assign ps2_kbd_led_status[1] = 0;
 assign ps2_kbd_led_status[2] = drive_led;    // Use the Scroll Lock LED for Floppy Activity
 
 
@@ -203,7 +212,7 @@ assign ps2_kbd_led_status[2] = drive_led;    // Use the Scroll Lock LED for Flop
 // 0         1         2         3          4         5         6
 // 01234567890123456789012345678901 23456789012345678901234567890123
 // 0123456789ABCDEFGHIJKLMNOPQRSTUV 0123456789ABCDEFGHIJKLMNOPQRSTUV
-// XX XXXXXXXXXXXXXXXXXXXXXXXXX                                 XX
+// XX XXXXXXXXXXXXXXXXXXXXXXXXXXXXX                             XX
 
 // IOCTL INDEX
 // 0	- Boot.rom
@@ -223,15 +232,24 @@ parameter CONF_STR = {
 	"F1,M99BIN,Load Full Cart;",
 	"F2,BIN,Load Rom Cart;",
 	"F3,BIN,Load Grom Cart;",
-	"S0,DSK,Drive 1;",
-	"S1,DSK,Drive 2;",
-	"S2,DSK,Drive 3;",
+	"d6S0,DSK,Drive 1;",
+	"d6S1,DSK,Drive 2;",
+	"d6S2,DSK,Drive 3;",
+	"h2OS,TIFDC Disk Speed,Normal,Turbo;",
+	"h3P4,MyArc FDC Dip Switches;",
+	"P4OS,MyArc Disk Speed,Normal,Turbo;",
+	"H4P4OT,Drive 1 Seek Speed,6ms,20/2ms;",
+	"H4P4OU,Drive 2 Seek Speed,6ms,20/2ms;",
+	"H4P4OV,Drive 3 Seek Speed,6ms,20/2ms;",
+	"h4P4OT,Drive 1 Drive Type,5-1/4\",3-1/2\";",
+	"h4P4OU,Drive 2 Drive Type,5-1/4\",3-1/2\";",
+	"h4P4OV,Drive 3 Drive Type,5-1/4\",3-1/2\";",
 	"-;",
 	"OIK,Cart Type,Normal,MBX,Paged7,Paged378,Paged379,MiniMem;",	//Normal = 0, MBX = 1, Paged7 = 2, UberGrom = 3, Paged378 = 4, MiniMem = 5
 	"H0P1,Mini Mem;",
 	"P1S3,DAT,NVRAM File;",
-	"P1rS,Load NVRAM;",
-	"P1rT,Save NVRAM;",
+	"D5P1rS,Load NVRAM;",
+	"D5P1rT,Save NVRAM;",
 
 	"P2,Video Settings;",
 	"P2OD,Video Mode,NTSC, PAL;",
@@ -259,6 +277,7 @@ parameter CONF_STR = {
 	"-;",
 	"OC,Arrow Keys,Cursor, Joystick;",
 	"OB,Swap joysticks,NO,YES;",
+	"o01,Mouse,Disabled,Mechatronics,Joy1,Joy2;",
 //	"-;",
 //	"oA,Pause When OSD is Open,No,Yes;",
 	"RR,Reset & Detach Cart;",
@@ -282,6 +301,11 @@ wire sams_en    = status[22];
 wire tipi_en    = status[23];
 // Tipi CRU Base options at the moment are 1000, 1100, 1200 and 1400.  Can be expanded or hard coded for 1000 - 1F00, just set tipi_crubase to 0 thru F
 wire [3:0] tipi_crubase = (status[25:24] == 2'b11) ?  4'b0100 : status[25:24];
+
+//wire myarc_en   = (disk_dsr_hash == 'h6C || disk_dsr_hash == 'h6B);
+wire myarc_en   = (disk_dsr_hash == 'h6C);
+wire myarc80    = (disk_dsr_hash == 'h6B);
+wire [1:0] mecmouse_en = status[33:32];
 
 //Bring up OSD when no system/boot rom is loaded - copied from Megadrive/Genesis core
 reg osd_btn = 0;
@@ -338,13 +362,15 @@ end
 wire [63:0] status;
 wire [63:0] status_o;		//So we can update OCD Settings on the fly
 wire			status_update;	//Trigger the status update
-wire [15:0] status_mask = {scandoubler, cart_type !=5};
+wire [15:0] status_mask = {fdc_en, ~nv_file_valid, myarc80, (myarc_en || myarc80) && fdc_en, fdc_en && ~myarc_en && ~myarc80, scandoubler, cart_type !=5};
 wire  [1:0] buttons;
 
 wire [31:0] joy0, joy1;
 wire [10:0] ps2_key;
 wire  [2:0] ps2_kbd_led_use = { 1'b1, 1'b0, 1'b1};
 wire  [2:0] ps2_kbd_led_status;
+wire [24:0] ps2_mouse;
+
 
 wire        ioctl_download;
 wire  [7:0] ioctl_index;
@@ -354,26 +380,26 @@ wire  [7:0] ioctl_dout;
 wire        forced_scandoubler;
 wire [21:0] gamma_bus;
 
-wire [31:0] sd_lba;
+wire [31:0] sd_lba[4];
+wire	[5:0] sd_blk_cnt[4];
+
 wire  [3:0] sd_rd;
 wire  [3:0] sd_wr;
-//wire  [1:0] sd_ack;
-wire        sd_ack;
+wire  [3:0] sd_ack;
 wire  [8:0] sd_buff_addr;
 wire  [7:0] sd_buff_dout;
-wire  [7:0] sd_buff_din;
+wire  [7:0] sd_buff_din[4];
 wire        sd_buff_wr;	//sd_dout_strobe
 wire  [3:0] img_mounted;
 wire [31:0] img_size;
 wire  [2:0]	cart_type = status[20:18];
 wire [31:0] img_ext;
+wire        fdc_en = ~(tipi_en == 1'b1 && tipi_crubase == 4'b0001) && disk_dsr_hash != 0;
 
-hps_io #(.STRLEN($size(CONF_STR)>>3), .VDNUM(4)) hps_io
+hps_io #(.CONF_STR(CONF_STR), .VDNUM(4), .BLKSZ(1)) hps_io
 (
 	.clk_sys(clk_sys),
 	.HPS_BUS(HPS_BUS),
-
-	.conf_str(CONF_STR),
 
 	.buttons(buttons),
 	.status(status),
@@ -391,6 +417,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3), .VDNUM(4)) hps_io
 	.sd_buff_dout(sd_buff_dout),
 	.sd_buff_din(sd_buff_din),
 	.sd_buff_wr(sd_buff_wr),
+   .sd_blk_cnt(sd_blk_cnt), 		// number of blocks-1, total size ((sd_blk_cnt+1)*(1<<(BLKSZ+7))) must be <= 16384!
 
 	.img_mounted(img_mounted),
 	.img_size(img_size),
@@ -405,6 +432,7 @@ hps_io #(.STRLEN($size(CONF_STR)>>3), .VDNUM(4)) hps_io
 	.ps2_key(ps2_key),
 	.ps2_kbd_led_use(ps2_kbd_led_use),
 	.ps2_kbd_led_status(ps2_kbd_led_status),
+	.ps2_mouse(ps2_mouse),
 
 	.joystick_0(joy0),
 	.joystick_1(joy1)
@@ -521,6 +549,7 @@ reg	[7:0]  m99Ver = 'd0;
 reg	[7:0]  m99CartType = 'd0;
 reg	[15:0]  m99RomBlks = 'd0;
 reg	[15:0]  m99Groms = 'd0;
+reg   [7:0] disk_dsr_hash = 8'd0;
 
 //Determine where in ram to store the downloaded data based on IOCTL_INDEX
 always @(posedge clk_sys) begin
@@ -682,6 +711,17 @@ sdram sdram
    .ready(sdram_ready)
 );
 
+//Generate a hash of the Disk DSR to determine which DSR is being used
+always @(posedge clk_sys) begin
+	reg [26:0] last_ioaddr;
+	if(ioctl_download && ioctl_index == 7 && ioctl_addr == 28'h0) disk_dsr_hash = 0;
+	last_ioaddr <= ioctl_addr;
+	if(ioctl_download == 1 && ioctl_index == 7  && last_ioaddr != ioctl_addr ) begin
+		disk_dsr_hash = disk_dsr_hash + ioctl_dout[0];
+	end
+end
+
+
 //Mega Cart - bank count.  IOCTL_INDEX of 2
 always @(posedge clk_sys) begin
 	if(~nvram_en) ram_di <= sdram_din;
@@ -705,10 +745,10 @@ always @(posedge clk_sys) begin
 		nvram_save_addr <= nv_dout_counter + 24'h1000;
 		nvram_rd_strobe <= 1;
 	end
-	else if(nvram_rd_strobe == 0 && sd_ack) begin
+	else if(nvram_rd_strobe == 0 && sd_ack[3]) begin
 		if(saving_nv && sdram_ready) begin
-			if(nv_dout_counter == nv_buff_addr+(nv_lba*512)) begin
-				nv_din <= sdram_din[7:0];
+			if(nv_dout_counter == nv_buff_addr+(sd_lba[3]*512)) begin
+				sd_buff_din[3] <= sdram_din[7:0];
 				if (nv_dout_counter < 4095 ) begin
 					nv_dout_counter = nv_dout_counter + 1'b1;					//If counter is under 4095, increment by one
 					nvram_save_addr <= nv_dout_counter + 24'h1000;
@@ -786,17 +826,26 @@ ep994a console
 	.hblank_o(hblank),
 	.vblank_o(vblank),
 
+	.myarcfdc_en(myarc_en || myarc80),
+	.fdc_turbo(status[28]),
+	.myarcSwitches(status[31:29]),
+	.myarc80(myarc80),
+
 	.img_mounted(img_mounted[2:0]),
 	.img_wp("000"),							//Currently the floppy images are not write protected
 	.img_size(img_size),
 
-	.sd_lba(fd_lba),
+	.sd_lba_fd0(sd_lba[0]),
+	.sd_lba_fd1(sd_lba[1]),
+	.sd_lba_fd2(sd_lba[2]),
 	.sd_rd(sd_rd[2:0]),
 	.sd_wr(sd_wr[2:0]),
-	.sd_ack(fd_ack),
+	.sd_ack(fd_ack[2:0]),
 	.sd_buff_addr(fd_buff_addr),
 	.sd_dout(fd_dout),
-	.sd_din(fd_din),
+	.sd_din_fd0(sd_buff_din[0]),
+	.sd_din_fd1(sd_buff_din[1]),
+	.sd_din_fd2(sd_buff_din[2]),
 	.sd_dout_strobe(fd_buff_wr),
 
 	.audio_total_o(audio),
@@ -978,16 +1027,13 @@ video_mixer #(.LINE_LENGTH(284), .GAMMA(1)) video_mixer
 
 wire pause;
 wire  [7:0] fd_dout;
-wire  [7:0] fd_din;
+wire  [7:0] fd_din[2:0];
 wire  [7:0] nv_dout;
-wire  [7:0] nv_din;
-wire [31:0] fd_lba;
-wire [31:0] nv_lba;
 wire  [8:0] fd_buff_addr;
 wire  [8:0] nv_buff_addr;
 
 
-wire			fd_ack;
+wire	[2:0]	fd_ack;
 wire			nv_ack;
 wire        fd_buff_wr;
 wire			nv_buff_wr;
@@ -1000,19 +1046,18 @@ always @(posedge clk_sys) begin
 	
 	if(sd_data_path) begin
 		nv_dout <= sd_buff_dout;
-		sd_buff_din <= nv_din[7:0];
-		sd_lba <= nv_lba;
+//		sd_buff_din[3] <= nv_din;
+//		sd_lba[3] <= nv_lba;
 		nv_buff_wr <= sd_buff_wr;
 		nv_buff_addr <= sd_buff_addr;
-		nv_ack <= sd_ack;						//Should update from single bit to # of Devices when updating Framework
+		nv_ack <= sd_ack[3];						//Should update from single bit to # of Devices when updating Framework
 	end
    else begin
 		fd_dout <= sd_buff_dout;
-		sd_buff_din <= fd_din;
-		sd_lba <= fd_lba;
+
 		fd_buff_wr <= sd_buff_wr;
 		fd_buff_addr <= sd_buff_addr;
-		fd_ack <= sd_ack;						//Should update from single bit to # of Devices when updating Framework
+		fd_ack[2:0] <= sd_ack[2:0];						//Should update from single bit to # of Devices when updating Framework
 	end
 end
 
@@ -1038,7 +1083,7 @@ end
 
 reg nvram_en;				//Indicates we are either Reading or Writing NVRAM data to/from memory and file on sd card
 
-assign nvram_addr[24:0] = { 13'h1, nv_lba[2:0], nv_buff_addr[8:0]};			// 7000-7FFF (ram location: 1000-1fff)
+assign nvram_addr[24:0] = { 13'h1, sd_lba[3][3:0], nv_buff_addr[7:0]};			// 7000-7FFF (ram location: 1000-1fff)
 reg loading_nv;
 reg saving_nv;
 
@@ -1064,13 +1109,13 @@ always @(posedge clk_sys) begin
 	if(~load_nvD && load_nv) begin
 		loading_nv <= 1;
 		nvram_en <= 1;
-		nv_lba <= 0;					//Start with first block of SD Buffer
+		sd_lba[3] <= 0;					//Start with first block of SD Buffer
 		pause <= 1;
 	end
 	if(~save_nvD && save_nv) begin
 		saving_nv <= 1;
 		nvram_en <= 1;
-		nv_lba <= 0;					//Start with first block of SD Buffer
+		sd_lba[3] <= 0;					//Start with first block of SD Buffer
 		pause <= 1;
 	end
 
@@ -1092,8 +1137,8 @@ always @(posedge clk_sys) begin
 
 	SD_READ:
 	if (nv_ackD & ~nv_ack) begin
-		if(nv_lba <7) begin
-			nv_lba <= nv_lba + 1'd1;
+		if(sd_lba[3] <15) begin
+			sd_lba[3] <= sd_lba[3] + 1'd1;
 			sd_rd[3] <= 1;
 		end
 		else begin
@@ -1106,8 +1151,8 @@ always @(posedge clk_sys) begin
 
 	SD_WRITE:
 	if (nv_ackD & ~nv_ack) begin
-		if(nv_lba <7) begin
-			nv_lba <= nv_lba +1'd1;
+		if(sd_lba[3] <15) begin
+			sd_lba[3] <= sd_lba[3] +1'd1;
 			sd_wr[3] <= 1;
 		end
 		else begin
@@ -1138,6 +1183,19 @@ assign USER_OUT[4] = rpi_din;				//SSRX+
 
 
 /////////////////////////////////////////////////  Control  /////////////////////////////////////////////////
+// Mouse
+wire [4:0] mouseData;
+mecmouse mouse(
+	.clk(clk_sys),
+	.reset(reset),
+	.ps2_mouse(ps2_mouse),
+	.j1_s(~keyboardSignals_i[1]),
+	.j2_s(~keyboardSignals_i[0]),
+	.mode(mecmouse_en[1]),
+	.mecmouse_o(mouseData)
+);
+	
+// Keyboard
 
 wire       pressed = ps2_key[9];
 wire [8:0] code    = ps2_key[8:0];
@@ -1325,17 +1383,19 @@ reg btn_down  = 0;
 reg btn_left  = 0;
 reg btn_right = 0;
 reg btn_fire  = 0;
+//|0|0|0|U|D|R|L|B|
+//00 - off, 01, Mechatronics, 10 Joy1, 11 joy2
+wire m_right2  = mecmouse_en && mecmouse_en[0] == 1 ? ~mouseData[2] : joy_swap ? joy0[0] : joy1[0];
+wire m_left2   = mecmouse_en && mecmouse_en[0] == 1 ? ~mouseData[1] : joy_swap ? joy0[1] : joy1[1];
+wire m_down2   = mecmouse_en && mecmouse_en[0] == 1 ? ~mouseData[3] : joy_swap ? joy0[2] : joy1[2];
+wire m_up2     = mecmouse_en && mecmouse_en[0] == 1 ? ~mouseData[4] : joy_swap ? joy0[3] : joy1[3];
+wire m_fire2   = mecmouse_en && mecmouse_en[0] == 1 ? ~mouseData[0] : joy_swap ? joy0[4] | joy1[5] : joy1[4] | joy0[5]; // Fire 2 = fire button on second controller joy[5]
+wire m_right  = mecmouse_en && mecmouse_en < 3 ? ~mouseData[2] : btn_right | (joy_swap ? joy1[0] : joy0[0]);
+wire m_left   = mecmouse_en && mecmouse_en < 3 ? ~mouseData[1] : btn_left  | (joy_swap ? joy1[1] : joy0[1]);
+wire m_down   = mecmouse_en && mecmouse_en < 3 ? ~mouseData[3] : btn_down  | (joy_swap ? joy1[2] : joy0[2]);
+wire m_up     = mecmouse_en && mecmouse_en < 3 ? ~mouseData[4] : btn_up    | (joy_swap ? joy1[3] : joy0[3]);
+wire m_fire   = mecmouse_en && mecmouse_en < 3 ? ~mouseData[0] : btn_fire  | (joy_swap ? joy1[4] | joy0[5] : joy0[4] | joy1[5]);
 
-wire m_right2  = joy_swap ? joy0[0] : joy1[0];
-wire m_left2   = joy_swap ? joy0[1] : joy1[1];
-wire m_down2   = joy_swap ? joy0[2] : joy1[2];
-wire m_up2     = joy_swap ? joy0[3] : joy1[3];
-wire m_fire2   = joy_swap ? joy0[4] | joy1[5] : joy1[4] | joy0[5]; // Fire 2 = fire button on second controller joy[5]
-wire m_right  = btn_right | (joy_swap ? joy1[0] : joy0[0]);
-wire m_left   = btn_left  | (joy_swap ? joy1[1] : joy0[1]);
-wire m_down   = btn_down  | (joy_swap ? joy1[2] : joy0[2]);
-wire m_up     = btn_up    | (joy_swap ? joy1[3] : joy0[3]);
-wire m_fire   = btn_fire  | (joy_swap ? joy1[4] | joy0[5] : joy0[4] | joy1[5]);
 
 //Parsec uses keys 1,2,3: Make these joystick buttons for convenience
 //Also can be used to select menu on boot

@@ -27,9 +27,10 @@ set_global_assignment -name VERILOG_FILE "rtl/tipi/shift_pload_sout.v"
 set_global_assignment -name VERILOG_FILE "rtl/tipi/shift_sin_pout.v"
 
 set_global_assignment -name VERILOG_FILE "rtl/multiplier.v"
+set_global_assignment -name VERILOG_FILE "rtl/mecmouse.v"
 set_global_assignment -name VHDL_FILE rtl/cv_clock.vhd
 set_global_assignment -name VHDL_FILE rtl/cv_por.vhd
-set_global_assignment -name VERILOG_FILE "rtl/fdc1772/fdc1772.v"
+set_global_assignment -name SYSTEMVERILOG_FILE "rtl/fdc1772/fdc1772.sv"
 set_global_assignment -name VERILOG_FILE "rtl/fdc1772/floppy.v"
 set_global_assignment -name VHDL_FILE "fpga/src/ep994a.vhd"
 set_global_assignment -name VHDL_FILE "fpga/src/gromext.vhd"

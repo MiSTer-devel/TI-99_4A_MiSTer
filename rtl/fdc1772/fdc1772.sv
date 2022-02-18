@@ -25,6 +25,9 @@ module fdc1772 (
 	input            clkcpu, // system cpu clock.
 	input            clk8m_en,
 	input            fd1771, // 1771 compatibility
+	input            dden,
+	input            turbo,	 // Speed up reading/writing by ignoring sector under head
+	input            fd80, // MyArc currently selected drive is an 80 Track Drive 
 
 	// external set signals
 	input      [3:0] floppy_drive,
@@ -46,14 +49,17 @@ module fdc1772 (
 	input      [2:0] img_wp,      // write protect
 	input            img_ds,      // double-sided image (for BBC Micro only)
 	input     [31:0] img_size,    // size of image in bytes
-	output reg[31:0] sd_lba,
+	output reg[31:0] sd_lba_fd0,
+	output reg[31:0] sd_lba_fd1,
+	output reg[31:0] sd_lba_fd2,
 	output reg [2:0] sd_rd,
 	output reg [2:0] sd_wr,
-//	input      [2:0] sd_ack,
-	input            sd_ack,		//Single wire/bit for now till we upate framework where it uses 1 per device
+	input      [2:0] sd_ack,
 	input      [8:0] sd_buff_addr,
 	input      [7:0] sd_dout,
-	output     [7:0] sd_din,
+	output     [7:0] sd_din_fd0,
+	output     [7:0] sd_din_fd1,
+	output     [7:0] sd_din_fd2,
 	input            sd_dout_strobe,
 	output reg       drive_led
 );
@@ -72,6 +78,7 @@ always @(*) drive_led = motor_on;
 // --------------------- IO controller image handling ----------------------
 // -------------------------------------------------------------------------
 
+reg [31:0] sd_lba;
 always @(*) begin
 	case (SECTOR_SIZE_CODE)
 	// archie
@@ -79,10 +86,8 @@ always @(*) begin
 	// st
 	2: sd_lba = ((fd_spt*track[6:0]) << fd_doubleside) + (floppy_side ? 5'd0 : fd_spt) + sector[4:0] - 1'd1;
 	// bbc micro
-//	1: sd_lba = ((((fd_spt*track[6:0]) << fd_doubleside) + (floppy_side ? 5'd0 : fd_spt) + sector[4:0]) >> 1);
-//	1: sd_lba = ((((fd_spt*track[6:0])) + (floppy_side ? 5'd0 : fd_spt) + sector[4:0]) >> 1);
 	// TI994/A
-	1: sd_lba = ((((fd_spt*(floppy_side?track[6:0]:(~(track[6:0]-39))+40))) + (floppy_side ? 5'd0 : fd_spt) + sector[4:0]) >> 1);
+	1: sd_lba = ((((fd_spt*(floppy_side?track[6:0]:(~(track[6:0]-(image_tps - 1)))+image_tps))) + (floppy_side ? 5'd0 : fd_spt) + sector[4:0]));
 
 	default: sd_lba = 0;
 	endcase
@@ -97,6 +102,7 @@ wire         floppy_present = (floppy_drive == 4'b1110)?floppy_ready[0]:
 wire floppy_write_protected = (floppy_drive == 4'b1110)?img_wp[0]:
                               (floppy_drive == 4'b1101)?img_wp[1]:
                               (floppy_drive == 4'b1011)?img_wp[2]:1'b1;
+reg   [1:0] drive_sel;
 
 reg  [10:0] sector_len[3];
 reg   [4:0] spt[3];     // sectors/track
@@ -109,17 +115,22 @@ reg         fm;
 reg  [11:0] image_sectors;
 reg  [11:0] image_sps; // sectors/side
 reg   [4:0] image_spt; // sectors/track
+reg   [7:0] image_tps /* synthesis keep */; // tracks/side
 reg   [9:0] image_gap_len;
 reg         image_doubleside;
-reg   [4:0] image_interleave_mode; // Sector Interleave to use.  0- TI-controller (0,7,5,3,1,8,6,4,2),  1- Interleave 1 (1-spt)
+reg   [4:0] image_interleave_mode; // Sector Interleave to use.  0- TI-controller (0,7,5,3,1,8,6,4,2),  1- Interleave 1 (linear)
 wire        image_hd = img_size[20];
-
+reg 			allow_formatting;  // Prevents disk from being Formatted by creating an error on Write Track commands.  This prevents damage to disk images when DSRs don't support formatting them.
 
 always @(*) begin
+	reg [11:0] calc_spt;
+	drive_sel = floppy_drive == 4'b1110 ? 2'd0 : floppy_drive == 4'b1101 ? 2'd1 : 2'd2;
+
 	case (SECTOR_SIZE_CODE)
 	3: begin
 		// archie, 1024 bytes/sector
 		fm = 0;
+		allow_formatting = 1;
 		image_sectors = img_size[21:10];
 		image_doubleside = 1'b1;
 		image_spt = image_hd ? 5'd10 : 5'd5;
@@ -129,6 +140,7 @@ always @(*) begin
 	2: begin
 		// this block is valid for the .st format (or similar arrangement), 512 bytes/sector
 		fm = 0;
+		allow_formatting = 1;
 		image_sectors = img_size[20:9];
 		image_doubleside = 1'b0;
 		image_sps = image_sectors;
@@ -161,20 +173,55 @@ always @(*) begin
 	1: begin
 		// 256 bytes/sector single density (BBC SSD/DSD, TI99/4A)
 		fm = 1;
+		image_tps = 40;  //Default to 40
+		allow_formatting = 0;  // By default, don't allow formatting until a support floppy size is detected.
 		image_sectors = img_size[19:8];
 		image_doubleside = img_ds;
-//		if(image_sectors == 720) image_doubleside = 1;
-//		else image_doubleside = 0;
+		image_interleave_mode = 4'd0;
 		if (image_doubleside)
 			image_sps = image_sectors >> 1'b1;
 		else
 			image_sps = image_sectors;
 		case (image_sps)
-			360: image_spt = 9; // TI99/4A
-			default: image_spt = 10; // BBC Micro
+			360: begin
+					image_spt = 9; // TI99/4A
+					image_interleave_mode = 4'd0;
+					fm = 1;
+					allow_formatting = 1;
+				end
+			640: begin
+					image_spt = 16; // TI99/4A Double Density
+					image_interleave_mode = 4'd1;
+					fm = 0;
+					allow_formatting = 0;
+				end
+			720: begin
+					image_spt = fd80 ? 5'd9 : 5'd18; // TI99/4A 40 Track Double Density or 80 Track Single Density
+					image_interleave_mode = 4'd1;
+					fm = 0;
+					allow_formatting = 1;
+					if(fd80) image_tps = 80;
+				end
+			760: begin
+					image_spt = 19; // TI99/4A Double Density - Odd Disk size, may be a fluke and removed in the future.
+					image_interleave_mode = 4'd1;
+					fm = 0;
+					allow_formatting = 0;
+				end
+			1440: begin
+					image_spt = 18; // TI99/4A Double Density
+					image_interleave_mode = 4'd1;
+					fm = 0;
+					allow_formatting = 1;
+					image_tps = 80;
+				end
+			default: begin
+					calc_spt = image_sps/image_tps;
+					image_spt = calc_spt[4:0];
+					image_interleave_mode = 4'd1;
+				end
 		endcase
 		image_gap_len = 10'd50;
-		image_interleave_mode = 4'd0;
 	end
 	default: begin
 		fm = 0;
@@ -227,10 +274,7 @@ end
 // -------------------------------------------------------------------------
 reg cpu_selD;
 reg cpu_rwD;
-//reg track_operation_done;
-//reg track_operation_doneD;
 always @(posedge clkcpu) begin
-//	track_operation_doneD <= track_operation_done;
 	cpu_rwD <= cpu_sel & ~cpu_rw;
 	cpu_selD <= cpu_sel;
 end
@@ -532,7 +576,6 @@ wire delaying = (delay_cnt != 0);
 
 reg [7:0] step_to;
 reg RNF;
-//reg WF;	//Flandango - Write Fault flag for status
 reg sector_inc_strobe;
 reg track_inc_strobe;
 reg track_dec_strobe;
@@ -599,7 +642,6 @@ always @(posedge clkcpu) begin
 			notready_wait <= 1'b0;
 			sector_not_found <= 1'b0;
 			data_transfer_state <= 2'b00;
-
 			if(cmd_type_1 || cmd_type_2 || cmd_type_3) begin
 				RNF <= 1'b0;
 				motor_on <= 1'b1;
@@ -734,7 +776,10 @@ always @(posedge clkcpu) begin
 				// read sector
 				end else begin
 					if(cmd[7:5] == 3'b100) begin
-						if ((sector - SECTOR_BASE) >= fd_spt) begin
+						// Myarc uses the DDEN line to check if floppy is MFM by switching to FM, reading sector and looking for error
+						// therefore if the DDEN line doesn't match the FM/MFM determined for the floppy image, we error out.
+						// Ultimately Write Track will be properly implemented with CRC generation for both FM and MFM
+						if (((sector - SECTOR_BASE) >= fd_spt) || fm != dden) begin
 							// wait 5 rotations (1 sec) before setting RNF
 							sector_not_found <= 1'b1;
 							delay_cnt <= 24'd1000 * CLK_EN;
@@ -752,8 +797,7 @@ always @(posedge clkcpu) begin
 								// we are busy until the right sector header passes under 
 								// the head and the sd-card controller indicates the sector
 								// is in the fifo
-								if(fd_ready && fd_sector_hdr && (fd_sector == sector)) data_transfer_start <= 1'b1;
-//								if(fd_ready) data_transfer_start <= 1'b1;
+								if(fd_ready && (fd_sector_hdr  || turbo) && ((fd_sector == sector) || turbo)) data_transfer_start <= 1'b1;
 
 								if(data_transfer_done) begin
 									data_transfer_state <= 2'b00;
@@ -786,8 +830,8 @@ always @(posedge clkcpu) begin
 								end
 							2'b10: begin
 								// CPU phase
-								if (fifo_cpuptr == 0 && fd_ready && fd_sector_hdr && (fd_sector == sector)) data_transfer_start <= 1'b1;
-//								if (fifo_cpuptr == 0 && fd_ready) data_transfer_start <= 1'b1;
+//								if (fifo_cpuptr == 0 && fd_ready && (fd_sector_hdr  || turbo) && ((fd_sector == sector) || turbo)) data_transfer_start <= 1'b1;
+								if (fifo_cpuptr == 0 && fd_ready && fd_sector_hdr && fd_sector == sector) data_transfer_start <= 1'b1;
 								if (data_transfer_done) begin
 									sd_card_write <= 1;
 									data_transfer_state <= 2'b11;
@@ -835,9 +879,9 @@ always @(posedge clkcpu) begin
 					if(cmd[7:4] == 4'b1110) begin
 						busy <= 1'b0;
 					end
-
+					// write track
 					if(cmd[7:4] == 4'b1111) begin
-						if ((sector - SECTOR_BASE) >= fd_spt) begin
+						if ((sector - SECTOR_BASE) >= fd_spt || ~allow_formatting) begin
 							// wait 5 rotations (1 sec) before setting RNF
 							sector_not_found <= 1'b1;
 							delay_cnt <= 24'd1000 * CLK_EN;
@@ -851,7 +895,7 @@ always @(posedge clkcpu) begin
 								end
 							2'b10: begin
 								// CPU phase
-								if (fifo_cpuptr == 0 && fd_ready && fd_sector_hdr && (fd_sector == sector)) data_transfer_start <= 1'b1;
+								if (fifo_cpuptr == 0 && fd_ready && (fd_sector_hdr  || turbo) && ((fd_sector == sector) || turbo)) data_transfer_start <= 1'b1;
 								if (data_transfer_done) begin
 									sd_card_write <= 1;
 									data_transfer_state <= 2'b11;
@@ -865,6 +909,8 @@ always @(posedge clkcpu) begin
 								else begin
 									busy <= 1'b0;
 									sector_clear_strobe <= 0;
+									// If not in FD1771 mode, throw an interrupt, otherwise don't or it will lock up the TIFDC
+									if(~fd1771) irq_set <= 1'b1;
 								end
 							end
 
@@ -927,7 +973,6 @@ reg  [10:0] fifo_cpuptr;
 reg  [9:0] fifo_cpuptr_adj;
 wire [7:0] fifo_q;
 reg        s_odd; //odd sector
-reg        t_odd; //odd sector
 reg  [9:0] fifo_sdptr;
 
 always @(*) begin
@@ -937,16 +982,10 @@ always @(*) begin
 	else
 		fifo_sdptr = { 1'b0, sd_buff_addr };
 
-	if (SECTOR_SIZE_CODE == 1) begin
-		//To better align with FIFO/SD Blocks, we adjust the fifo ptr for ODD Tracks of Floppy Side A/0 and Even tracks of Floppy Side B/1
-		if(floppy_side==1 && track[0]) t_odd = 1;				//If Side A/1 and Odd Track, Align with second half of 512 byte SD block.
-		else if(floppy_side==0 && ~track[0]) t_odd = 1;		//If Side B/0 and Even Track, Align with second half of 512 byte SD block.
-		else t_odd = 0;												//Don't ajdust fifo ptr
-		fifo_cpuptr_adj = { 1'b0, (t_odd?~sector[0]:sector[0]), fifo_cpuptr[7:0] };
-	end
-	else
-		fifo_cpuptr_adj = fifo_cpuptr[9:0];
+	fifo_cpuptr_adj = fifo_cpuptr[9:0];
 end
+
+reg     [7:0] sd_din;
 
 fdc1772_dpram #(8, 10) fifo
 (
@@ -954,7 +993,7 @@ fdc1772_dpram #(8, 10) fifo
 
 	.address_a(fifo_sdptr),
 	.data_a(sd_dout),
-	.wren_a(sd_dout_strobe & sd_ack),
+	.wren_a(sd_dout_strobe & sd_ack[drive_sel]),
 	.q_a(sd_din),
 
 	.address_b(fifo_cpuptr_adj),
@@ -977,10 +1016,28 @@ always @(posedge clkcpu) begin
 	reg sd_card_readD;
 	reg sd_card_writeD;
 
+	if(drive_sel == 0) sd_din_fd0 = sd_din;
+	else if(drive_sel == 1) sd_din_fd1 = sd_din;
+	else if(drive_sel == 2) sd_din_fd2 = sd_din;
+
+	case (drive_sel)
+		0: sd_lba_fd0 = sd_lba;
+		1: sd_lba_fd1 = sd_lba;
+		2: sd_lba_fd2 = sd_lba;
+		default: begin
+			sd_lba_fd0 = 0;
+			sd_lba_fd1 = 0;
+			sd_lba_fd2 = 0;
+		end
+		
+	endcase
+
 	sd_card_readD <= sd_card_read;
 	sd_card_writeD <= sd_card_write;
-	sd_ackD <= sd_ack;
-	if (sd_ack) {sd_rd, sd_wr} <= 0;
+	sd_ackD <= sd_ack[drive_sel];
+	if (sd_ack[0]) {sd_rd[0], sd_wr[0]} <= 0;
+	if (sd_ack[1]) {sd_rd[1], sd_wr[1]} <= 0;
+	if (sd_ack[2]) {sd_rd[2], sd_wr[2]} <= 0;
 
 	case (sd_state)
 	SD_IDLE:
@@ -997,7 +1054,7 @@ always @(posedge clkcpu) begin
 	end
 
 	SD_READ:
-	if (sd_ackD & ~sd_ack) begin
+	if (sd_ackD & ~sd_ack[drive_sel]) begin
 		if (s_odd || SECTOR_SIZE_CODE != 3) begin
 			sd_state <= SD_IDLE;
 		end else begin
@@ -1007,7 +1064,7 @@ always @(posedge clkcpu) begin
 	end
 
 	SD_WRITE:
-	if (sd_ackD & ~sd_ack) begin
+	if (sd_ackD & ~sd_ack[drive_sel]) begin
 		if (s_odd || SECTOR_SIZE_CODE != 3) begin
 			sd_state <= SD_IDLE;
 		end else begin
@@ -1023,6 +1080,7 @@ end
 // -------------------- CPU data read/write -----------------------
 reg data_in_strobe;
 reg data_in_valid;
+reg data_mark_found;
 //reg [1:0] write_crc;
 //reg [15:0] crc;
 always @(posedge clkcpu) begin
@@ -1059,9 +1117,10 @@ always @(posedge clkcpu) begin
 			data_transfer_cnt <= SECTOR_SIZE + 1'd1;
 
 		if(cmd[7:4] == 4'b1111) begin
-			if(sector != (fd_spt -1)) data_transfer_cnt <= fd_spt * SECTOR_SIZE + 1'd1;
-//			if(sector != 8) data_transfer_cnt <= fd_spt * SECTOR_SIZE + 1'd1;
-			else data_transfer_cnt <= fd_spt * SECTOR_SIZE + 1'd1 + 11'd256;
+			if(sector == 0) data_transfer_cnt <= SECTOR_SIZE + (fm ? 11'd74 : 11'd114); // 11'd32 + 11'd81 + 11'd1;  // 12/32 Bytes Index Mark Filler and 61/81 Bytes of non-data sector information (fm/mfm), +1 for counter offset
+			else if(sector != (fd_spt -1)) data_transfer_cnt <= SECTOR_SIZE + (fm ? 11'd62 : 11'd82); //11'd81 + 11'd1; // If not last Sector on track, just add the 61/81 Bytes of sector information, +1 for counter offset
+			else if(sector == (fd_spt -1)) data_transfer_cnt <= SECTOR_SIZE + 11'd302; // 11'd81 + 11'd218 + 11'd1; // Last Sector includes 240/218 bytes of Track End Filler, +1 for counter offset
+			data_mark_found <= 0;
 		end
 		// write sector asserts drq earlier to fill up the data register in time
 		if(cmd[7:5] == 3'b101 || cmd[7:4] == 4'b1111) drq_set <= !data_in_valid;
@@ -1083,7 +1142,8 @@ always @(posedge clkcpu) begin
 				if(cmd[7:4] == 4'b1100) begin
 					case(data_transfer_cnt)
 						7: data_out <= fd_track;
-						6: data_out <= { 7'b0000000, fd1771 ^ floppy_side };
+//						6: data_out <= { 7'b0000000, fd1771 ^ floppy_side };
+						6: data_out <= { 7'b0000000, 1'b1 ^ floppy_side };  //Myarc FDC seems to also reverses the floppy_side bit
 						5: data_out <= fd_sector;
 						4: data_out <= SECTOR_SIZE_CODE[7:0]; // TODO: sec size 0=128, 1=256, 2=512, 3=1024
 						3: data_out <= 8'ha5;
@@ -1101,6 +1161,7 @@ always @(posedge clkcpu) begin
 					data_in_strobe <= 1;
 					data_in_valid <= 0;
 				end
+				
 				// Write Track
 				if(cmd[7:4] == 4'b1111) begin
 					case(data_in)
@@ -1147,24 +1208,59 @@ always @(posedge clkcpu) begin
 //							data_in_valid <= 0;
 //							data_transfer_cnt <= data_transfer_cnt + 11'd1;
 //						end
-						'hff: begin
-							data_in_valid <= 0;
-							if(sector == 8 && fifo_cpuptr == SECTOR_SIZE) begin
-								data_transfer_cnt <= data_transfer_cnt - 11'd1;
-							end
-						end
-						'he5: begin
-							data_in_strobe <= 1;
+//						'h4e: begin
+//							data_in_valid <= 0;
+//							if(fm) begin
+//								if (fifo_cpuptr < SECTOR_SIZE) data_in_strobe <= 1;
+//								data_transfer_cnt <= data_transfer_cnt - 11'd1;
+//							end
+//						end
+						'hf5, 'hf6, 'hf7: begin  // Not to be written to SD Card
 							data_in_valid <= 0;
 							data_transfer_cnt <= data_transfer_cnt - 11'd1;
+//							if(sector == (fd_spt -1) && fifo_cpuptr == SECTOR_SIZE) begin
+//								data_transfer_cnt <= data_transfer_cnt - 11'd1;
+//							end
 						end
-						default: begin
-//							crc <= 'hFFFF;
+						'hfb: begin
 							data_in_valid <= 0;
-							if(sector == (fd_spt -1) && fifo_cpuptr == SECTOR_SIZE) begin
-								data_transfer_cnt <= 1;
-							end
+//							if(data_mark_found && fifo_cpuptr < SECTOR_SIZE) data_in_strobe <= 1;
+//							else data_mark_found <= 1;
+							data_mark_found <= 1;
+							data_transfer_cnt <= data_transfer_cnt - 11'd1;
 						end
+						'hf8, 'hf9,	'hfa,
+						'hfc, 'hfe, 'hff: begin	// Not to be written to SD Card if in FM mode
+							data_in_valid <= 0;
+//							if(~fm) begin
+//								if(data_mark_found) data_in_strobe <= 1;
+//								if (fifo_cpuptr == SECTOR_SIZE) data_transfer_cnt <= 1;
+//							end
+								
+							data_transfer_cnt <= data_transfer_cnt - 11'd1;
+//							if(sector == (fd_spt -1) && fifo_cpuptr == SECTOR_SIZE) begin
+//								data_transfer_cnt <= data_transfer_cnt - 11'd1;
+//							end
+						end
+//						'hd7, 'he5: begin
+//							data_in_strobe <= 1;
+//							data_in_valid <= 0;
+//							data_transfer_cnt <= data_transfer_cnt - 11'd1;
+//						end
+						default: begin
+							if(data_mark_found && fifo_cpuptr < SECTOR_SIZE) data_in_strobe <= 1;
+							data_in_valid <= 0;
+							data_transfer_cnt <= data_transfer_cnt - 11'd1;
+							//if(sector < (fd_spt -1) && fifo_cpuptr == SECTOR_SIZE && data_transfer_cnt > 15) data_transfer_cnt <= 15;
+//							if (fifo_cpuptr == SECTOR_SIZE) data_transfer_cnt <= 1;
+						end
+//						default: begin
+////							crc <= 'hFFFF;
+//							data_in_valid <= 0;
+//							if(sector == (fd_spt -1) && fifo_cpuptr == SECTOR_SIZE) begin
+//								data_transfer_cnt <= 1;
+//							end
+//						end
 					endcase
 				end
 				
@@ -1191,19 +1287,19 @@ wire [7:0] status = { fd1771 ? !floppy_present : motor_on,
 		      1'b0,                                // crc error
 		      cmd_type_1?fd_track0:data_lost,      // track0/data lost
 		      cmd_type_1?~fd_index:drq,            // index mark/drq
-		      busy };
+		      busy  /* synthesis keep */};
 
-reg [7:0] track;
+reg [7:0] track /* verilator public */;
 reg [7:0] sector;
 reg [7:0] data_in;
 reg [7:0] data_out;
 
 reg step_dir;
-reg motor_on = 1'b0;
+reg motor_on /* verilator public */ = 1'b0;
 reg data_lost;
 
 // ---------------------------- command register -----------------------   
-reg [7:0] cmd;
+reg [7:0] cmd /* verilator public */;
 wire cmd_type_1 = (cmd[7] == 1'b0);
 wire cmd_type_2 = (cmd[7:6] == 2'b10);
 wire cmd_type_3 = (cmd[7:5] == 3'b111) || (cmd[7:4] == 4'b1100);

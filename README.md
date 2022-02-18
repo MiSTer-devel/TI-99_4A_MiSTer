@@ -14,7 +14,10 @@ See below for original readme
 - Supports cartridges up to 32Megs (non-M99 roms can be loaded via the *Load Rom Cart* menu option.
 - Support for MBX, Paged7, Paged378, Paged379 and MiniMem Cartridges.
 - MiniMem utilizes 4K NVRAM file.  Use the MiniMem OSD sub menu to Select the NVRAM file then Load/Save to use it. A Blank 4k NVRAM.dat file is in the Releases folder.
-- Up to three, Single and Double Sided Floppies are supported (Single Density only).
+- Up to three, Single and Double Sided Floppies are supported.  
+  TI-FDC supports 40 Track Single Density only (SSSD/DSSD)   
+  Myarc-FDC supports 40 Track up to Double Density (SSSD/DSSD/SSDD/DSDD)   
+  Myarc-FDC-80 supports 40 and 80 Track Single and Double Density.  Diskutility 4.x formats 80 track DD as Quad Density.
 - NTSC/PAL Video Modes are supported.
 - SAMS memory (1Meg), can be disabled via OSD.
 - Tipi support via User IO port.  TIPI DSR required from [Tipi Downloads](https://jedimatt42.com/downloads.html).
@@ -48,6 +51,9 @@ See below for original readme
 - The Roms/Groms/DSRs specified in the Hardware submenu persist through reboots.
 - The *System Grom* (994AGROM.BIN) and the *System Rom* (994aROM.BIN) are required at a minimum.  
   Alternate Grom/Roms (ex 994AGrom-QI.BIN) can also be used.
+- The standard TI-FDC DSR provides 40 Track SSSD/DSSD Floppy Support.  
+  The Myarc-FDC DSR (crc32 042968A9) (found in MAME) provides 40 Track SSSD/DSSD/SSDD/DSDD,  
+  while the Myarc-FDC-80Track DSR (crc32 7BF4862B) provides access to 3.5" Floppy Images.
 - The Disk, TIPI and PCode DSR/Roms are optional, but required if you want to use the related feature.
 - File names are not important, but must end in **.bin**.
 
