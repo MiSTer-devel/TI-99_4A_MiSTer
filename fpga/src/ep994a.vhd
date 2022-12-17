@@ -344,6 +344,7 @@ architecture Behavioral of ep994a is
 	signal cartridge_cs	 : std_logic;	-- 0x6000..0x7FFF
 	signal mbx_rom_bank : std_logic_vector(1 downto 0);
 	signal uber_rom_bank : std_logic_vector(11 downto 0);
+	signal cart_mask     : std_logic_vector(11 downto 0);
 
 	-- audio subsystem
 	signal dac_data		: std_logic_vector(7 downto 0);	-- data from TMS9919 to DAC input
@@ -629,6 +630,21 @@ begin
 		end if;
 	end process;
 
+	--Flandango-Cart Rom Masking
+	
+	cart_mask <= x"FFF" when cart_8k_banks(11)='1' else
+	             x"7FF" when cart_8k_banks(10)='1' else
+					 x"3FF" when cart_8k_banks(9) ='1' else
+					 x"1FF" when cart_8k_banks(8) ='1' else
+					 x"0FF" when cart_8k_banks(7) ='1' else
+					 x"07F" when cart_8k_banks(6) ='1' else
+					 x"03F" when cart_8k_banks(5) ='1' else
+					 x"01F" when cart_8k_banks(4) ='1' else
+					 x"00F" when cart_8k_banks(3) ='1' else
+					 x"007" when cart_8k_banks(2) ='1' else
+					 x"003" when cart_8k_banks(1) ='1' else
+					 x"001" when cart_8k_banks(0) ='1';
+	
 	-------------------------------------size
 
 	-- CPU reset out. If either cpu_reset_ctrl(0) or funky_reset(MSB) is zero, put CPU to reset.
@@ -1001,24 +1017,9 @@ begin
 						elsif cartridge_cs='1' and cpu_addr(14 downto 3)=x"E00" and cart_type_i = 2 then -- Paged7 bank switch (>7000 - 7006) 
 							mbx_rom_bank <= cpu_addr(2 downto 1);
 						elsif cartridge_cs='1' and (cpu_addr(15 downto 12)=x"6" or cpu_addr(15 downto 12)=x"7") and cart_type_i = 3 then -- Paged378 bank switch (>6000 - 61FE) 
-							uber_rom_bank <= (cpu_addr(12 downto 1) and cart_8k_banks(11 downto 0));
-						elsif cartridge_cs='1' and cpu_addr(14 downto 7)=x"C0" and cart_type_i = 4 then -- Paged379 bank switch (>6000 - 607E) 
-							uber_rom_bank <= (others => '0');
-							-- Depending on how many banks the cartridge/rom has, we will need to figure out where the paging registers reside,
-							--    since they are inverse (bottom up) than that of say Paged378
-							if cart_8k_banks = 1 or cart_8k_banks = 2 then
-								uber_rom_bank <= "00000000000" & (not cpu_addr(1) and '1');
-							elsif cart_8k_banks = 3 or cart_8k_banks = 4 then
-								uber_rom_bank <= "0000000000" & (not cpu_addr(2 downto 1) and "11");
-							elsif cart_8k_banks > 4 and cart_8k_banks < 9 then
-								uber_rom_bank <= "000000000" & (not cpu_addr(3 downto 1) and "111");
-							elsif cart_8k_banks > 8 and cart_8k_banks < 17 then
-								uber_rom_bank <= "00000000" & (not cpu_addr(4 downto 1) and "1111");
-							elsif cart_8k_banks > 16 and cart_8k_banks < 33 then
-								uber_rom_bank <= "0000000" & (not cpu_addr(5 downto 1) and "11111");
-							elsif cart_8k_banks > 32 and cart_8k_banks < 65 then
-								uber_rom_bank <= "000000" & not cpu_addr(6 downto 1) and "111111";
-							end if;
+							uber_rom_bank <= (cpu_addr(12 downto 1) and cart_mask);
+						elsif cartridge_cs='1' and cpu_addr(14 downto 13)=x"3" and cart_type_i = 4 then -- Paged379 bank switch (>6000 - 7FFF) 
+							uber_rom_bank <= not cpu_addr(12 downto 1) and cart_mask;
 						elsif cpu_addr(15 downto 8) = x"84" then	
 							tms9919_we <= '1';		-- Audio chip write
 							audio_data_out <= data_from_cpu(15 downto 8);
