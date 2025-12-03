@@ -579,7 +579,7 @@ always @(posedge clk_sys) begin
 						sdram_we = ioctl_wr;
 					end
 					else if(ioctl_addr >= 28'h10000 && ioctl_addr <=28'h15FFF && ~autoloaded_roms[0]) begin
-						download_addr = ioctl_addr + 23'h80000;
+						download_addr = ioctl_addr - 28'h10000 + 23'h80000;
 						sdram_we = ioctl_wr;
 					end
 					else if(ioctl_addr >= 28'h16000 && ioctl_addr <= 28'h1FFFF) begin
